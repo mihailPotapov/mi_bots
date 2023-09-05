@@ -1,0 +1,42 @@
+# @bot.message_handler(content_types=['text'])
+# def te(message):
+#     chatId = message.chat.id
+#     text = message.text.lower
+#     if message.chat.type == 'private':
+#         if message.text == 'загадки':
+#                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#                 item1 = types.KeyboardButton("загадай загадку")
+#                 item2 = types.KeyboardButton("◀назад")
+#                 markup.add(item1, item2)
+#                 bot.send_message(message.chat.id, 'хочешь загадку? давай сыграем', reply_markup=markup)
+#         elif message.text == 'загадай загадку':
+#                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#                 item1 = types.KeyboardButton("не знаю")
+#                 markup.add(item1)
+#                 bot.send_message(message.chat.id, 'Вспушит она свои бока,Свои четыре уголка,И тебя, как ночь настанет,Все равно к себе притянет. что это?', reply_markup=markup)
+#         elif message.text in ['Подушка', 'подушка']:
+#                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#                 item1 = types.KeyboardButton("◀назад")
+#                 markup.add(item1)
+#                 bot.send_message(message.chat.id, 'правильно, молодец! больше загадок пока не знаю', reply_markup=markup)
+#         elif message.text == 'не знаю':
+#                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#                 item1 = types.KeyboardButton("◀назад")
+#                 markup.add(item1)
+#                 bot.send_message(message.chat.id, 'правильный ответ подушка.\nБольше загадок пока не знаю', reply_markup=markup)
+#         elif message.text == '◀назад':
+#                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#                 item1 = types.KeyboardButton("🗃разное")
+#                 item2 = types.KeyboardButton("🖼медия")
+#                 item3 = types.KeyboardButton("загадки")
+#                 markup.add(item1, item2, item3)
+#                 bot.send_message(message.chat.id, 'да?', reply_markup=markup)
+#         elif message.text in ["Vi", "vi", "VI", "Ви", "ви", "ВИ", "Bot_vi", "Bot_Vi", "Bot", "bot", "Бот", "бот"]:
+#                 markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+#                 item1 = types.KeyboardButton("🗃разное")
+#                 item2 = types.KeyboardButton("🖼медия")
+#                 item3 = types.KeyboardButton("загадки")
+#                 markup.add(item1, item2, item3)
+#                 bot.send_message(message.chat.id, 'Я тут, что-то хотели?', reply_markup=markup)
+#         else:
+#             bot.send_message(message.chat.id, 'я не понимаю тебя')

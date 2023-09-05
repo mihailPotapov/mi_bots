@@ -1,0 +1,10 @@
+@dp.message_handler(is_admin=True, commands=["ban"], commands_prefix="!/")
+async def ban(message: types.Message):
+    if message.reply_to_message:
+        await message.reply("это должен быть ответ на сообщение")
+        return
+
+    await message.bot.delete_message(chat_id=config.GROUP_ID, message_id=message.message_id)
+    await message.bot.kick_chat_member(chat_id=config.GROUP_ID, user_id=message.reply_to_message.from_user.id)
+
+    await message.reply_to_message.reply("забанен!!!")
