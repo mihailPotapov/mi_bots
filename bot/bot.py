@@ -137,9 +137,7 @@ def test(message):
             gif2 = open("гиф/Sticker.tgs", 'rb')
             bot.send_sticker(chat_id, gif2)
         elif text == 'скинь гифку':
-            bot.send_message(chat_id, 'держи')
-            gif_path = send_random_image(chat_id, masiv_filtr.gif)
-            bot.send_video(chat_id, open(gif_path, 'rb'))
+            send_random_gif(chat_id, masiv_filtr.gif)
         elif text == back_button:
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
             item1 = types.KeyboardButton("🗃разное")
@@ -178,6 +176,13 @@ def send_random_image(chat_id, image_list):
         img_path = random.choice(image_list)
         bot.send_photo(chat_id, photo=open(img_path, 'rb'))
 
+#         работает  с ошибкой
+
+def send_random_gif(chat_id, gif_list):
+    if gif_list:
+        bot.send_message(chat_id, 'держи 😎')
+        gif_list = random.choice(gif_list)
+        bot.send_video(chat_id, open(gif_list, 'rb'))
 def get_user_balance(user_id):
     conn, cursor = connect_to_database()
     cursor.execute("SELECT balance FROM users WHERE user_id=?", (user_id,))
