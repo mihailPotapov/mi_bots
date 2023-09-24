@@ -1,11 +1,16 @@
 import telebot
 import config
 import random
-
+import masiv_filtr
 from telebot import types
 
-bot = telebot.TeleBot(config.TOKEN)
 
+bot = telebot.TeleBot(config.TOKEN)
+oboi_gryt =masiv_filtr.oboi_gryt
+oboi_anime=masiv_filtr.oboi_anime
+mat = masiv_filtr.mat
+Vi = masiv_filtr.Vi
+otvet=masiv_filtr.otvet
 
 @bot.message_handler(commands=['start'])
 def welcome(message):
@@ -59,14 +64,6 @@ def test(message):
             bot.send_message(message.chat.id,
                              'я бот созданый криворуким програмистом, сейчас умею отправлять стикер, гифку, фото'
                              '\nТак же могу тебя послать')
-        elif message.text == 'test':
-            bot.send_message(message.chat.id, 'держи')
-            oboi = ["фото2/oboi1.jpg", "фото2/oboi2.jpg", "фото2/oboi3.jpg", "фото2/oboi4.jpg", "фото2/oboi5.jpg",
-                    "фото2/oboi6.jpg", "фото2/oboi7.jpg", "фото2/oboi8.jpg", "фото2/oboi9.jpg", "фото2/oboi10.jpg",
-                    "фото2/oboi11.jpg", "фото2/oboi12.jpg", "фото2/oboi13.jpg", "фото2/oboi14.jpg", "фото2/oboi15.jpg",
-                    "фото2/oboi16.jpg"]
-            img_path = random.choice(oboi)
-            bot.send_photo(message.chat.id, photo=open(img_path, 'rb'))
         elif message.text == 'Хочу обои':
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
             item1 = types.KeyboardButton("Хочу крутые обои😎")
@@ -76,29 +73,22 @@ def test(message):
             bot.send_message(message.chat.id, 'Аниме или крутые обои😎?', reply_markup=markup)
         elif message.text == 'Хочу крутые обои😎':
             bot.send_message(message.chat.id, 'держи😎')
-            oboi = ["фото2/oboi1.jpg", "фото2/oboi2.jpg", "фото2/oboi3.jpg", "фото2/oboi4.jpg", "фото2/oboi5.jpg",
-                    "фото2/oboi6.jpg",]
-            img_path = random.choice(oboi)
+            img_path = random.choice(oboi_gryt)
             bot.send_photo(message.chat.id, photo=open(img_path, 'rb'))
         elif message.text == 'Аниме':
             bot.send_message(message.chat.id, 'держи😎')
-            oboi = ["фото2/oboi7.jpg", "фото2/oboi8.jpg", "фото2/oboi9.jpg", "фото2/oboi10.jpg",
-                    "фото2/oboi11.jpg", "фото2/oboi12.jpg", "фото2/oboi13.jpg", "фото2/oboi14.jpg", "фото2/oboi15.jpg",
-                    "фото2/oboi16.jpg"]
-            img_path = random.choice(oboi)
+            img_path = random.choice(oboi_anime)
             bot.send_photo(message.chat.id, photo=open(img_path, 'rb'))
         elif message.text in ["Привет", "привет", ]:
             bot.send_message(message.chat.id, 'Привет')
             gif1 = open("гиф/AnimatedSticker5.tgs", 'rb')
             bot.send_sticker(message.chat.id, gif1)
-        elif message.text in ["почему ты материшься?", "Почему ты материшься?", "Почему ты посылаешь?",
-                              "почему ты посылаешь?", "Почему ты посылаешь меня?", "почему ты посылаешь меня?"]:
+        elif message.text in otvet:
             bot.send_message(message.chat.id, 'Вам пишет разработчик:'
                                               '\n"Зачем я научил бота посылать в ответ? ЗАЧЕМ?.."')
             foto1 = open("фото/ric.jpg", 'rb')
             bot.send_photo(message.chat.id, foto1)
-        elif message.text in ["Иди на хуй", "Иди нахуй", "иди на хуй", "иди нахуй", "пошел на хуй", "пошёл на хуй",
-                              "пошел нахуй", "пошёл нахуй", "Пошел на хуй", "Пошёл нахуй", "Пошёл на хуй"]:
+        elif message.text in mat:
             bot.send_message(message.chat.id, 'сам иди на хуй')
             gif2 = open("гиф/Sticker.tgs", 'rb')
             bot.send_sticker(message.chat.id, gif2)
@@ -114,7 +104,7 @@ def test(message):
             # item3 = types.KeyboardButton("загадки")
             markup.add(item1, item2)
             bot.send_message(message.chat.id, 'да?', reply_markup=markup)
-        elif message.text in ["Vi", "vi", "VI", "Ви", "ви", "ВИ", "Bot_vi", "Bot_Vi", "Bot", "bot", "Бот", "бот"]:
+        elif message.text in Vi:
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
             item1 = types.KeyboardButton("🗃разное")
             item2 = types.KeyboardButton("🖼медия")
