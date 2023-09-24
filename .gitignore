@@ -1,5 +1,8 @@
 **/config.py
-*/bot.py
 */аниме
 /резерв коп
-**/.idea
+/venv
+/.idea
+/.vscode
+/.env
+/config.cfg
