@@ -1,0 +1,25 @@
+@bot.message_handler(content_types=['text'])
+def lalala(message):
+    if message.chat.type == 'private':
+        if message.text == '🎲 Рандомное число':
+ bot.send_message(message.chat.id , str(random.randint(0,100)))
+        elif message.text == '😊 Как дела?':
+ 
+ markup = types.InlineKeyboardMarkup(row_width=2)
+ item1 = types.InlineKeyboardButton("Хорошо", callback_data='good')
+ item2 = types.InlineKeyboardButton("Не очень", callback_data='bad')
+ 
+ markup.add(item1, item2)
+ 
+ bot.send_message(message.chat.id, 'Отлично, сам как?', reply_markup=markup)
+        else:
+ bot.send_message(message.chat.id, 'Я не знаю что ответить 😢')
+ 
+@bot.callback_query_handler(func=lambda call: True)
+def
+    try:
+        if call.message:
+            if call.data == 'good':
+ bot.send_message(call.message.chat.id, 'Вот и отличненько 😊')
+            elif.data == 'bad':
+ bot.send_message(call.message.chat.id, 'Бывает 😢')
