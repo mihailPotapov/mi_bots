@@ -2,9 +2,9 @@ import telebot
 import config
 import random
 import masiv_filtr
+import sqlite3
 from telebot import types
 
-import sqlite3
 
 # config
 # внутри config.cfg -> TOKEN: ''
@@ -50,7 +50,6 @@ def welcome(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1 = types.KeyboardButton("🗃разное")
     item2 = types.KeyboardButton("🖼медия")
-    # item3 = types.KeyboardButton("загадки")
     markup.add(item1, item2)
 
     bot.send_message(message.chat.id,"Добро пожаловать, {0.first_name}!"
