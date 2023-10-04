@@ -17,10 +17,12 @@ misc_menu = "Выберите разное:"
 
 back_button = "◀назад"
 
+
 # подключение к базе
 def connect_to_database():
     conn = sqlite3.connect('../sqlbase.db')
     return conn, conn.cursor()
+
 
 def is_user_exists(user_id):
     conn, cursor = connect_to_database()
@@ -29,11 +31,13 @@ def is_user_exists(user_id):
     conn.close()
     return result is not None
 
+
 def add_new_user(user_id):
     conn, cursor = connect_to_database()
     cursor.execute("INSERT INTO users (user_id, balance) VALUES (?, ?)", (user_id, 0))
     conn.commit()
     conn.close()
+
 
 @bot.message_handler(commands=['start'])
 def welcome(message):
@@ -169,6 +173,7 @@ def callback_inline(call):
     except Exception as e:
         print(repr(e))
 
+
 def send_random_image(chat_id, image_list):
     if image_list:
         bot.send_message(chat_id, 'держи 😎')
@@ -177,11 +182,13 @@ def send_random_image(chat_id, image_list):
 
 #         работает  с ошибкой
 
+
 def send_random_gif(chat_id, gif_list):
     if gif_list:
         bot.send_message(chat_id, 'держи 😎')
         gif_list = random.choice(gif_list)
         bot.send_video(chat_id, open(gif_list, 'rb'))
+
 def get_user_balance(user_id):
     conn, cursor = connect_to_database()
     cursor.execute("SELECT balance FROM users WHERE user_id=?", (user_id,))
@@ -189,11 +196,13 @@ def get_user_balance(user_id):
     conn.close()
     return result[0] if result else 0
 
+
 def update_user_balance(user_id, new_balance):
     conn, cursor = connect_to_database()
     cursor.execute("UPDATE users SET balance=? WHERE user_id=?", (new_balance, user_id))
     conn.commit()
     conn.close()
+
 
 # RUN
 bot.polling(none_stop=True)
