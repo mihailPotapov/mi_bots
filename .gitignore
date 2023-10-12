@@ -1,8 +1,8 @@
-**/config.py
-*/аниме
-/резерв коп
-/venv
-/.idea
-/.vscode
-/.env
-/config.cfg
+аниме/
+резерв коп/
+venv/
+__pycache__/
+.idea/
+.vscode/
+.env
+*.db

@@ -1,15 +1,15 @@
-oboi_gryt = ["фото2/oboi1.jpg", "фото2/oboi2.jpg", "фото2/oboi3.jpg",
-             "фото2/oboi4.jpg", "фото2/oboi5.jpg", "фото2/oboi6.jpg"]
+oboi_gryt = ["wallpaper/oboi1.jpg", "wallpaper/oboi2.jpg", "wallpaper/oboi3.jpg",
+             "wallpaper/oboi4.jpg", "wallpaper/oboi5.jpg", "wallpaper/oboi6.jpg"]
 
-oboi_anime = ["фото2/oboi7.jpg", "фото2/oboi8.jpg", "фото2/oboi9.jpg", "фото2/oboi10.jpg", "фото2/oboi11.jpg",
-              "фото2/oboi12.jpg", "фото2/oboi13.jpg", "фото2/oboi14.jpg", "фото2/oboi15.jpg", "фото2/oboi16.jpg"]
+oboi_anime = ["wallpaper/oboi7.jpg", "wallpaper/oboi8.jpg", "wallpaper/oboi9.jpg", "wallpaper/oboi10.jpg", "wallpaper/oboi11.jpg",
+              "wallpaper/oboi12.jpg", "wallpaper/oboi13.jpg", "wallpaper/oboi14.jpg", "wallpaper/oboi15.jpg", "wallpaper/oboi16.jpg"]
 
 mat = ["Иди на хуй", "Иди нахуй", "иди на хуй", "иди нахуй", "пошел на хуй", "пошёл на хуй",
        "пошел нахуй", "пошёл нахуй", "Пошел на хуй", "Пошёл нахуй", "Пошёл на хуй"]
 
-Vi=["Vi", "vi", "VI", "Ви", "ви", "ВИ", "Bot_vi", "Bot_Vi", "Bot", "bot", "Бот", "бот"]
+Vi = ["Vi", "vi", "VI", "Ви", "ви", "ВИ", "Bot_vi", "Bot_Vi", "Bot", "bot", "Бот", "бот"]
 
-otvet=["почему ты материшься?", "Почему ты материшься?", "Почему ты посылаешь?", 
+otvet = ["почему ты материшься?", "Почему ты материшься?", "Почему ты посылаешь?", 
        "почему ты посылаешь?", "Почему ты посылаешь меня?", "почему ты посылаешь меня?"]
 
-gif = ["гиф/gif.gif", "гиф/ser.gif", "гиф/gif2.gif", "гиф/gif3.gif"]
+gif = ["gif/gif.gif", "gif/ser.gif", "gif/gif2.gif", "gif/gif3.gif"]
