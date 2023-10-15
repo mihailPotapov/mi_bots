@@ -8,7 +8,7 @@ from data_manager import TOKEN, UserDatabase
 BACK_BUTTON = "◀ назад"
 WELCOME_MESSAGE = (
     "Добро пожаловать, {0.first_name}!\n"
-    "Я - <b>{1.first_name}</b>, бот созданный, чтобы быть подопытным кроликом."
+    "Я - <b>{1.first_name}</b>, бот созданный для проверки разный функций."
 )
 
 # Инициализация бота и базы данных
@@ -35,7 +35,7 @@ def main(message):
 
     if message.chat.type == 'private':
         if text == '🎲 рандомное число':
-            perform_purchase(chat_id, user_id, 10, lambda: bot.send_message(chat_id, f"Выпало число: {str(random.randint(0, 100))}"))
+            perform_purchase(chat_id, user_id, 10, lambda: bot.send_message(chat_id, f"Выпало число: {str(random.randint(0, 1000))}"))
 
         elif text == '🤑 заработать денег':
             current_balance = db.get_user_balance(user_id)
@@ -62,6 +62,9 @@ def main(message):
 
         elif text == 'расскажи о себе?':
             bot.send_message(chat_id, 'Я - бот, созданный для предоставления различных услуг. ')
+# ошибка попробовать найти решение
+        elif text == 'Что ты умеешь?':
+            bot.send_message(chat_id, 'Я - бот, который умеет отправлять фото и gif, и задавать рандомное число ')
        
         elif text == 'хочу обои':
             wallpapers_menu(chat_id)
@@ -72,7 +75,7 @@ def main(message):
         elif text == 'аниме':
             perform_purchase(chat_id, user_id, 22, lambda: send_random_image(chat_id, masiv_filtr.oboi_anime))
 
-        elif text == 'привет':
+        elif text == ['привет','Привет']:
             bot.send_message(chat_id, 'Привет! 👋')
             bot.send_sticker(chat_id, sticker=open("gif/AnimatedSticker.tgs", 'rb'))
 
@@ -95,8 +98,15 @@ def main(message):
         elif text in masiv_filtr.Vi:
             diverse_menu(chat_id)
 
+        elif text == 'чит деньги':
+            current_balance = db.get_user_balance(user_id)
+            new_balance = current_balance + 100000
+            db.update_user_balance(user_id, new_balance)
+            bot.send_message(chat_id, f"💰 Вы заработали 100000 монету так как вы вип.\n💵 Баланс: {new_balance}")
+
         else:
             bot.send_message(chat_id, 'Я не понимаю тебя. 😕')
+            bot.send_message(chat_id, 'Проверьте правильно ли Вы ввели команду, используйте лучше клавиатуру.')
 
 def start_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -120,8 +130,9 @@ def diverse_menu(chat_id):
     item3 = types.KeyboardButton("расскажи о себе?")
     item4 = types.KeyboardButton("🤑 заработать денег")
     item5 = types.KeyboardButton("💼 мой баланс")
-    item6 = types.KeyboardButton(BACK_BUTTON)
-    markup.add(item1, item2, item3, item4, item5, item6)
+    item6 = types.KeyboardButton("Что ты умеешь?")
+    item7 = types.KeyboardButton(BACK_BUTTON)
+    markup.add(item1, item2, item3, item4, item5, item6,item7)
     bot.send_message(chat_id, "Выберите раздел:", reply_markup=markup)
 
 def wallpapers_menu(chat_id):
