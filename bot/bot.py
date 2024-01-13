@@ -3,6 +3,11 @@ import random
 import masiv_filtr
 from telebot import types
 from data_manager import TOKEN, UserDatabase
+import logging
+
+# # Создаем файл логов
+# handler = logging.FileHandler('bot.log')
+# handler.setLevel(logging.DEBUG)
 
 # Константы
 BACK_BUTTON = "◀ назад"
@@ -35,7 +40,7 @@ def main(message):
 
     if message.chat.type == 'private':
         if text == '🎲 рандомное число':
-            perform_purchase(chat_id, user_id, 10, lambda: bot.send_message(chat_id, f"Выпало число: {str(random.randint(0, 1000))}"))
+            perform_purchase(chat_id, user_id, 0, lambda: bot.send_message(chat_id, f"Выпало число: {str(random.randint(0, 1000))}"))
 
         elif text == '🤑 заработать денег':
             current_balance = db.get_user_balance(user_id)
@@ -63,17 +68,17 @@ def main(message):
         elif text == 'расскажи о себе?':
             bot.send_message(chat_id, 'Я - бот, созданный для предоставления различных услуг. ')
 # ошибка попробовать найти решение
-        elif text == 'Что ты умеешь?':
+        elif text == 'что ты умеешь?':
             bot.send_message(chat_id, 'Я - бот, который умеет отправлять фото и gif, и задавать рандомное число ')
        
         elif text == 'хочу обои':
             wallpapers_menu(chat_id)
 
         elif text == 'хочу крутые обои 😎':
-            perform_purchase(chat_id, user_id, 21, lambda: send_random_image(chat_id, masiv_filtr.oboi_gryt))
+            perform_purchase(chat_id, user_id, 0, lambda: send_random_image(chat_id, masiv_filtr.oboi_gryt))
 
         elif text == 'аниме':
-            perform_purchase(chat_id, user_id, 22, lambda: send_random_image(chat_id, masiv_filtr.oboi_anime))
+            perform_purchase(chat_id, user_id, 0, lambda: send_random_image(chat_id, masiv_filtr.oboi_anime))
 
         elif text == ['привет','Привет']:
             bot.send_message(chat_id, 'Привет! 👋')
@@ -87,7 +92,7 @@ def main(message):
             bot.send_sticker(chat_id, sticker=open("gif/Sticker.tgs", 'rb'))
 
         elif text == 'скинь гифку':
-            perform_purchase(chat_id, user_id, 30, lambda: (
+            perform_purchase(chat_id, user_id, 0, lambda: (
                 bot.send_message(chat_id, 'Держи гифку! 😎'),
                 bot.send_document(chat_id, document=open(random.choice(masiv_filtr.gif), 'rb'))
             ))
@@ -130,7 +135,7 @@ def diverse_menu(chat_id):
     item3 = types.KeyboardButton("расскажи о себе?")
     item4 = types.KeyboardButton("🤑 заработать денег")
     item5 = types.KeyboardButton("💼 мой баланс")
-    item6 = types.KeyboardButton("Что ты умеешь?")
+    item6 = types.KeyboardButton("что ты умеешь?")
     item7 = types.KeyboardButton(BACK_BUTTON)
     markup.add(item1, item2, item3, item4, item5, item6,item7)
     bot.send_message(chat_id, "Выберите раздел:", reply_markup=markup)
