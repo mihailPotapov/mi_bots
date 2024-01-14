@@ -63,7 +63,7 @@ def main(message):
         elif text == 'расскажи о себе?':
             bot.send_message(chat_id, 'Я - бот, созданный для предоставления различных услуг. ')
 # ошибка попробовать найти решение
-        elif text == 'Что ты умеешь?':
+        elif text == 'что ты умеешь?':
             bot.send_message(chat_id, 'Я - бот, который умеет отправлять фото и gif, и задавать рандомное число ')
        
         elif text == 'хочу обои':
@@ -130,7 +130,7 @@ def diverse_menu(chat_id):
     item3 = types.KeyboardButton("расскажи о себе?")
     item4 = types.KeyboardButton("🤑 заработать денег")
     item5 = types.KeyboardButton("💼 мой баланс")
-    item6 = types.KeyboardButton("Что ты умеешь?")
+    item6 = types.KeyboardButton("что ты умеешь?")
     item7 = types.KeyboardButton(BACK_BUTTON)
     markup.add(item1, item2, item3, item4, item5, item6,item7)
     bot.send_message(chat_id, "Выберите раздел:", reply_markup=markup)
