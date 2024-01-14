@@ -3,6 +3,11 @@ import random
 import masiv_filtr
 from telebot import types
 from data_manager import TOKEN, UserDatabase
+import logging
+
+# # Создаем файл логов
+# handler = logging.FileHandler('bot.log')
+# handler.setLevel(logging.DEBUG)
 
 # Константы
 BACK_BUTTON = "◀ назад"
@@ -35,7 +40,7 @@ def main(message):
 
     if message.chat.type == 'private':
         if text == '🎲 рандомное число':
-            perform_purchase(chat_id, user_id, 10, lambda: bot.send_message(chat_id, f"Выпало число: {str(random.randint(0, 1000))}"))
+            perform_purchase(chat_id, user_id, 0, lambda: bot.send_message(chat_id, f"Выпало число: {str(random.randint(0, 1000))}"))
 
         elif text == '🤑 заработать денег':
             current_balance = db.get_user_balance(user_id)
@@ -70,10 +75,10 @@ def main(message):
             wallpapers_menu(chat_id)
 
         elif text == 'хочу крутые обои 😎':
-            perform_purchase(chat_id, user_id, 21, lambda: send_random_image(chat_id, masiv_filtr.oboi_gryt))
+            perform_purchase(chat_id, user_id, 0, lambda: send_random_image(chat_id, masiv_filtr.oboi_gryt))
 
         elif text == 'аниме':
-            perform_purchase(chat_id, user_id, 22, lambda: send_random_image(chat_id, masiv_filtr.oboi_anime))
+            perform_purchase(chat_id, user_id, 0, lambda: send_random_image(chat_id, masiv_filtr.oboi_anime))
 
         elif text == ['привет','Привет']:
             bot.send_message(chat_id, 'Привет! 👋')
@@ -87,7 +92,7 @@ def main(message):
             bot.send_sticker(chat_id, sticker=open("gif/Sticker.tgs", 'rb'))
 
         elif text == 'скинь гифку':
-            perform_purchase(chat_id, user_id, 30, lambda: (
+            perform_purchase(chat_id, user_id, 0, lambda: (
                 bot.send_message(chat_id, 'Держи гифку! 😎'),
                 bot.send_document(chat_id, document=open(random.choice(masiv_filtr.gif), 'rb'))
             ))
