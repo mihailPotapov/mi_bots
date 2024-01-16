@@ -5,7 +5,7 @@
 from openai import OpenAI
 
 client = OpenAI(api_key="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")
-prompt = str(input())
+prompt = str(input())#  водим ответ в консоле
 completion = client.chat.completions.create(
   model="gpt-3.5-turbo-1106",
   messages=[
@@ -13,6 +13,6 @@ completion = client.chat.completions.create(
     {"role": "user", "content": prompt}
   ]
 )
-print('Вопрос:', prompt)
+print('Вопрос:', prompt)# пишет повторно вопрос
 print('\nОтвет:')
-print(completion.choices[0].message)
+print(completion.choices[0].message)# пишет ответ в консоле
