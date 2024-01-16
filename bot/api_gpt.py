@@ -1,30 +1,18 @@
-# "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"
-# from openai import OpenAI
-# client = OpenAI(
-#     api_key="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",
-# )
-#
-# chat_completion = client.chat.completions.create(
-#     messages=[
-#         {
-#             "role": "user",
-#             "content": "Say this is a test",
-#         }
-#     ],
-#     model="gpt-3.5-turbo",
-# )
-#
-# print(chat_completion.choices[0].message)
-import openai
-openai.api_key ="ak-cedd8139570246509b46ed003996a42a"
-engine="text-davinci-003"
+# import telebot
+# from telebot import types
+# from data_manager import TOKEN
+# TOKEN = "5676606819:AAFmECqYhffaGAaJOD4SThzOcICSQNNEF0I"
+from openai import OpenAI
 
-# Модель
-# пишешь запрос в консоле и в консоле получаешь ответ
+client = OpenAI(api_key="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")
 prompt = str(input())
-completion = openai.Completion.create(engine=engine,
-                                      prompt=prompt,
-                                      temperature=0.5,
-                                      max_tokens=1000)
+completion = client.chat.completions.create(
+  model="gpt-3.5-turbo-1106",
+  messages=[
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": prompt}
+  ]
+)
+print('Вопрос:', prompt)
 print('\nОтвет:')
-print( completion.choices[0]['text'] )
+print(completion.choices[0].message)
