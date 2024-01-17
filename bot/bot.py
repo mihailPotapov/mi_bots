@@ -3,11 +3,7 @@ import random
 import masiv_filtr
 from telebot import types
 from data_manager import TOKEN, UserDatabase
-import logging
 
-# # Создаем файл логов
-# handler = logging.FileHandler('bot.log')
-# handler.setLevel(logging.DEBUG)
 
 # Константы
 BACK_BUTTON = "◀ назад"
