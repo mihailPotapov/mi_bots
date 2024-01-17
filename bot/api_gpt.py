@@ -3,7 +3,6 @@ from telebot import types
 from data_manager import TOKEN, OPENAI_API_KEY
 from openai import OpenAI
 
-
 bot = telebot.TeleBot(TOKEN)
 
 BACK_BUTTON = "◀ назад"
@@ -24,7 +23,7 @@ def welcome(message):
 def gpt(message):
     # получаем вопрос от пользователя
     prompt = message.text
-    client = OpenAI(api_key='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')
+    client = OpenAI(api_key='')
     # prompt = str(input())#  водим ответ в консоле
     response = client.chat.completions.create(
         model="gpt-3.5-turbo-1106",
