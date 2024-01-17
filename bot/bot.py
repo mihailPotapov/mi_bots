@@ -16,6 +16,7 @@ WELCOME_MESSAGE = (
 bot = telebot.TeleBot(TOKEN)
 db = UserDatabase('userdatabase.db')
 
+
 @bot.message_handler(commands=['start'])
 def welcome(message):
     hi = open('image/Hi.webp', 'rb')
@@ -27,6 +28,7 @@ def welcome(message):
         db.add_new_user(user_id)
 
     bot.send_message(message.chat.id, WELCOME_MESSAGE.format(message.from_user, bot.get_me()), parse_mode='html', reply_markup=start_menu())
+
 
 @bot.message_handler(content_types=['text'])
 def main(message):
@@ -136,6 +138,7 @@ def diverse_menu(chat_id):
     markup.add(item1, item2, item3, item4, item5, item6,item7)
     bot.send_message(chat_id, "Выберите раздел:", reply_markup=markup)
 
+
 def wallpapers_menu(chat_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1 = types.KeyboardButton("хочу крутые обои 😎")
@@ -144,11 +147,13 @@ def wallpapers_menu(chat_id):
     markup.add(item1, item2, item3)
     bot.send_message(chat_id, 'Аниме или крутые обои? 😎', reply_markup=markup)
 
+
 def send_random_image(chat_id, image_list):
     if image_list:
         bot.send_message(chat_id, 'Держи! 😎')
         img_path = random.choice(image_list)
         bot.send_photo(chat_id, photo=open(img_path, 'rb'))
+
 
 def perform_purchase(chat_id, user_id, item_price, item_action):
     current_balance = db.get_user_balance(user_id)
@@ -162,6 +167,7 @@ def perform_purchase(chat_id, user_id, item_price, item_action):
         db.update_user_balance(user_id, new_balance)
         bot.send_message(chat_id, f"💵 Баланс: {new_balance}")
         item_action()
+
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_inline(call):

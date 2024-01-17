@@ -16,7 +16,8 @@ completion = client.chat.completions.create(
 print('Вопрос:', prompt)
 print('\nОтвет:')
 print(completion.choices[0].message)
-
+# попытка запустить через aiogram
+# error - openai.error.AuthenticationError: Incorrect API key provided: sk-k8uqX***************************************ADL0. You can find your API key at
 # import openai
 # from aiogram import Bot, types, Dispatcher
 # from aiogram.utils import executor
@@ -46,4 +47,36 @@ print(completion.choices[0].message)
 #
 #
 # executor.start_polling(bots, skip_updates=True)
+
+# попытка  не удачная telebot
+
+# import telebot
+# import openai
+# from data_manager import TOKEN, OPENAI_API_KEY
+#
+# openai.api_key = OPENAI_API_KEY
+# bot = telebot.TeleBot(TOKEN)
+#
+#
+# @bot.message_handler(commands=['start'])
+# def welcome(message):
+#     bot.send_message(message.chat.id, 'Привет, я ChatGPT s telegram.')
+#
+#
+# @bot.message_handler(content_types=['text'])
+# def talk(message):
+#     response = openai.Completion.create(
+#         model="text-davinci-003",
+#         prompt=message.text,
+#         temperature=0.5,
+#         max_tokens=1000,
+#         top_p=1.0,
+#         frequency_penalty=0.5,
+#         presence_penalty=0.5
+#     )
+#     gpt_text = response['choices'][0].message
+#     bot.send_message(message.chat.id, gpt_text)
+#
+#
+# bot.polling(none_stop=True)
 
