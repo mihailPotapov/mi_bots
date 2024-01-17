@@ -26,7 +26,7 @@ def gpt(message):
     prompt = message.text
     client = OpenAI(api_key='')
     # prompt = str(input())#  водим ответ в консоле
-
+    # gpt-4, gpt-4 turbo попробовать новую модель позже
     response = client.chat.completions.create(
         model="gpt-3.5-turbo-1106",
         messages=[
@@ -39,11 +39,15 @@ def gpt(message):
     print('\nОтвет:',prompt)
     # gpt_text=str(response)
     gpt_text2=response.choices[0].message.content
+    tokens=response.usage.total_tokens
 # ответ в консоле
     print(gpt_text2)
+    print('потрачено токенов:',tokens)
     # print(gpt_text)
 #  ответ пишет пользователю
     bot.send_message(message.chat.id, gpt_text2)
+    bot.send_message(message.chat.id, f"потрачено следующее количество токенов: {tokens}")
+
 
 
 # @bot.message_handler(content_types=['text'])
@@ -66,10 +70,11 @@ def gpt(message):
 def start_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1 = types.KeyboardButton("🗃 gpt_chat")
-    item2 = types.KeyboardButton("🎭 текущая роль")
-    item3 = types.KeyboardButton("🎭 задать роль")
-    item4 = types.KeyboardButton("/start")
-    markup.add(item1, item2, item3,item4)
+    item2 = types.KeyboardButton("/start")
+    item3 = types.KeyboardButton("расскажи анекдот про программиста")
+    item4 = types.KeyboardButton("🎭 текущая роль")
+    item5 = types.KeyboardButton("🎭 задать роль")
+    markup.add(item1, item2, item3,item4,item5)
     return markup
 
 
