@@ -182,6 +182,8 @@ def callback_inline(call):
     except Exception as e:
         print(repr(e))
 
+
+
 if __name__ == "__main__":
     print('Запущен...')
     bot.polling(none_stop=True)
