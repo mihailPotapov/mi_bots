@@ -1,21 +1,21 @@
 # import telebot
 # from telebot import types
 # from data_manager import TOKEN
-# TOKEN = "5676606819:AAFmECqYhffaGAaJOD4SThzOcICSQNNEF0I"
-from openai import OpenAI
-# запрос пишем в консоле, ответ получаем тоже в консоле
-prompt= str(input())
-client = OpenAI(api_key="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")
-completion = client.chat.completions.create(
-    model="gpt-3.5-turbo-1106",
-    messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": prompt}
-    ]
-)
-print('Вопрос:', prompt)
-print('\nОтвет:')
-print(completion.choices[0].message)
+# # TOKEN = "5676606819:AAFmECqYhffaGAaJOD4SThzOcICSQNNEF0I"
+# from openai import OpenAI
+# # запрос пишем в консоле, ответ получаем тоже в консоле
+# prompt= str(input())
+# client = OpenAI(api_key="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")
+# completion = client.chat.completions.create(
+#     model="gpt-3.5-turbo-1106",
+#     messages=[
+#         {"role": "system", "content": "You are a helpful assistant."},
+#         {"role": "user", "content": prompt}
+#     ]
+# )
+# print('Вопрос:', prompt)
+# print('\nОтвет:')
+# print(completion.choices[0].message)
 # попытка запустить через aiogram
 # error - openai.error.AuthenticationError: Incorrect API key provided: sk-k8uqX***************************************ADL0. You can find your API key at
 # import openai
@@ -49,7 +49,7 @@ print(completion.choices[0].message)
 # executor.start_polling(bots, skip_updates=True)
 
 # попытка  не удачная telebot
-
+#
 # import telebot
 # import openai
 # from data_manager import TOKEN, OPENAI_API_KEY
@@ -74,7 +74,7 @@ print(completion.choices[0].message)
 #         frequency_penalty=0.5,
 #         presence_penalty=0.5
 #     )
-#     gpt_text = response['choices'][0].message
+#     gpt_text = response['choices'][0]['text']
 #     bot.send_message(message.chat.id, gpt_text)
 #
 #
