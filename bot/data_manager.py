@@ -2,9 +2,12 @@ import os
 from dotenv.main import load_dotenv
 import sqlite3
 
+
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
 OPENAI_API_KEY=os.getenv("OPENAI_API_KEY")
+
+
 class UserDatabase:
     def __init__(self, db_path):
         self.db_path = db_path
