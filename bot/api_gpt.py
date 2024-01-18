@@ -1,6 +1,7 @@
 import telebot
 from telebot import types
-from data_manager import TOKEN, OPENAI_API_KEY
+from pathlib import Path
+from data_manager import TOKEN
 from openai import OpenAI
 
 
@@ -24,8 +25,9 @@ def welcome(message):
 def gpt(message):
     # получаем вопрос от пользователя
     prompt = message.text
+    msg=bot.send_message(message.chat.id, 'Сообщение принято. Ждем ответа..')
     client = OpenAI(api_key='')
-    # prompt = str(input())#  водим ответ в консоле
+    # prompt = str(input())  водим ответ в консоле
     # gpt-4, gpt-4 turbo попробовать новую модель позже
     response = client.chat.completions.create(
         model="gpt-3.5-turbo-1106",
@@ -34,37 +36,26 @@ def gpt(message):
             {"role": "user", "content": prompt}
         ]
     )
-
-# print('Вопрос:', prompt)# пишет повторно вопрос
-    print('\nОтвет:',prompt)
     # gpt_text=str(response)
     gpt_text2=response.choices[0].message.content
     tokens=response.usage.total_tokens
-# ответ в консоле
-    print(gpt_text2)
-    print('потрачено токенов:',tokens)
-    # print(gpt_text)
-#  ответ пишет пользователю
+    # удаление сообщение
+    # bot.edit_message_text("...", chat_id=message.chat.id, message_id=msg.message_id)
+    bot.delete_message(message.chat.id, msg.message_id)
+    #  ответ пишет пользователю
     bot.send_message(message.chat.id, gpt_text2)
     bot.send_message(message.chat.id, f"потрачено следующее количество токенов: {tokens}")
-
+#     bot.delete_message(message.chat.id, message.message_id - 1)
+# ответ в консоле
+    print('\nвопрос:', prompt)
+    print('\nответ:', gpt_text2)
+    print('потрачено токенов:', tokens)
 
 
 # @bot.message_handler(content_types=['text'])
-# def gpt(message):
-#     chat_id = message.chat.id
-#     text = message.text.lower()
-#     if message.chat.type == 'private':
-#         if text == '🎭 задать роль':
-#             bot.send_message(chat_id, 'Какую роль желаете? ')
-#
-#     elif text == '🗃 gpt_chat':
-#         bot.send_message(chat_id, 'Я gpt_chat что желаете? ')
-#
-#     elif text == '🎭 текущая роль':
-#         bot.send_message(chat_id, 'Я русский, научный помощник ')
-#
-#     else:
+# def chatting(message):
+#     if message.text == 'Сообщение принято. Ждем ответа..':
+#         bot.delete_message(message.chat.id, message.message_id)
 
 
 def start_menu():

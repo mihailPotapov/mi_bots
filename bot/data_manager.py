@@ -5,7 +5,7 @@ import sqlite3
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
-OPENAI_API_KEY=os.getenv("OPENAI_API_KEY")
+OpenAI=os.getenv("OpenAI")
 
 
 class UserDatabase:
