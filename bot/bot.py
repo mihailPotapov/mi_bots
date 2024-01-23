@@ -111,12 +111,14 @@ def main(message):
             bot.send_message(chat_id, 'Я не понимаю тебя. 😕')
             bot.send_message(chat_id, 'Проверьте правильно ли Вы ввели команду, используйте лучше клавиатуру.')
 
+
 def start_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1 = types.KeyboardButton("🗃 разное")
     item2 = types.KeyboardButton("🖼 медия")
     markup.add(item1, item2)
     return markup
+
 
 def media_menu(chat_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -125,6 +127,7 @@ def media_menu(chat_id):
     item3 = types.KeyboardButton(BACK_BUTTON)
     markup.add(item1, item2, item3)
     bot.send_message(chat_id, "Выберите тип медиа:", reply_markup=markup)
+
 
 def diverse_menu(chat_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -181,7 +184,6 @@ def callback_inline(call):
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Как дела? 😊", reply_markup=None)
     except Exception as e:
         print(repr(e))
-
 
 
 if __name__ == "__main__":
