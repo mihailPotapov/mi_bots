@@ -1,74 +1,86 @@
 import telebot
-import apsw
-import threading
+import psycopg2
 from telebot import types
 from data_manager import TOKEN
 from openai import OpenAI
 
-client = OpenAI(api_key='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')
+client = OpenAI(api_key='')
 
 bot = telebot.TeleBot(TOKEN)
-gpt_chat_enabled = False
+gpt_chat_enabled = {}  # Используем словарь для хранения состояния чата
 
-# Создание и подключение к базе данных SQLite с использованием apsw
-conn = apsw.Connection("gpt_chat.db")
-cursor_lock = threading.Lock()
+# Конфигурация подключения к базе данных
+db_config = {
+    "host": "localhost",
+    "database": "bot_gpt",
+    "user": "postgres",
+    "password": "123"
+}
+
+
+def get_db_connection():
+    conn = psycopg2.connect(**db_config)
+    return conn
+
+
+def user_exists(nickname_user):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE nickname_user = %s", (nickname_user,))
+    user = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return user is not None
+
+
+# Функция для добавления пользователя в БД
+def add_user_to_db(name_user, nickname_user, id_chat):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO users (name_user, nickname_user, id_chat) VALUES (%s, %s, %s)",
+                   (name_user, nickname_user, id_chat))
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 
 @bot.message_handler(commands=['start'])
 def welcome(message):
+    user = message.from_user
     hi = open('image/Hi.webp', 'rb')
-    bot.send_sticker(message.chat.id, hi)
-    bot.send_message(message.chat.id, 'Привет, я ChatGPT s telegram.', reply_markup=start_menu(), )
+    if user_exists(user.username):
+        bot.send_sticker(message.chat.id, hi)
+        bot.send_message(message.chat.id, "Рад снова вас видеть!", reply_markup=start_menu())
+        print("новый пользователь", user.first_name, user.username, message.chat.id)
+    else:
+        bot.send_sticker(message.chat.id, hi)
+        add_user_to_db(user.first_name, user.username, message.chat.id)
+        bot.send_message(message.chat.id, "Рад видеть новое лицо!", reply_markup=start_menu())
 
 
 # Функция для включения режима GPT чата
 @bot.message_handler(commands=['gpt_chat'])
 def enable_gpt_chat(message):
-    # Включение режима GPT чата для текущего пользователя
-    user_id = message.from_user.id
-    with cursor_lock:
-        cursor = conn.cursor()
-        cursor.execute('UPDATE users SET gpt_chat_enabled = 1 WHERE user_id = ?', (user_id,))
-        conn.commit()
-    bot.send_message(message.chat.id, "Режим GPT чата включен. Отправьте мне сообщение для начала чата.")
+    chat_id = message.chat.id
+    gpt_chat_enabled[chat_id] = True
+    bot.send_message(chat_id, "Режим GPT чата включен.")
 
 
 # Функция для отключения режима GPT чата
 @bot.message_handler(commands=['back', 'stop'])
 def disable_gpt_chat(message):
-    # Отключение режима GPT чата для текущего пользователя
-    user_id = message.from_user.id
-    with cursor_lock:
-        cursor = conn.cursor()
-        cursor.execute('UPDATE users SET gpt_chat_enabled = 0 WHERE user_id = ?', (user_id,))
-        conn.commit()
-    bot.send_message(message.chat.id, "Режим GPT чата отключен.")
+    chat_id = message.chat.id
+    gpt_chat_enabled[chat_id] = False
+    bot.send_message(chat_id, "Режим GPT чата отключен.")
 
 
 # Функция для обработки входящих сообщений
 @bot.message_handler(func=lambda message: True)
 def gpt(message):
-    # Получение состояния режима GPT чата для текущего пользователя
-    user_id = message.from_user.id
-    with cursor_lock:
-        cursor = conn.cursor()
-        cursor.execute('SELECT gpt_chat_enabled FROM users WHERE user_id = ?', (user_id,))
-        result = cursor.fetchone()
-
-        if result is not None:
-            gpt_chat_enabled = result[0]
-            print(f"User {user_id}, GPT chat enabled: {gpt_chat_enabled}")
-        else:
-            print(f"User {user_id} not found in the database.")
-            gpt_chat_enabled = 0
-
-    if gpt_chat_enabled:
-        # получаем вопрос от пользователя
+    chat_id = message.chat.id
+    if gpt_chat_enabled.get(chat_id, False):
         prompt = message.text
         msg = bot.send_message(message.chat.id, 'Сообщение принято. Ждем ответа..')
-        # prompt = str(input())  водим ответ в консоле
-        # gpt-4, gpt-4 turbo попробовать новую модель позже
         response = client.chat.completions.create(
             model="gpt-3.5-turbo-1106",
             messages=[
@@ -76,21 +88,16 @@ def gpt(message):
                 {"role": "user", "content": prompt}
             ]
         )
-        # gpt_text=str(response)
-        gpt_text2 = response.choices[0].message.content
+        gpt_text = response.choices[0].message.content
         tokens = response.usage.total_tokens
-        # удаление сообщение
-        # bot.edit_message_text("...", chat_id=message.chat.id, message_id=msg.message_id)
         bot.delete_message(message.chat.id, msg.message_id)
-        #  ответ пишет пользователю
-        bot.send_message(message.chat.id, gpt_text2)
+        bot.send_message(message.chat.id, gpt_text)
         bot.send_message(message.chat.id, f"потрачено следующее количество токенов: {tokens}")
-        # ответ в консоле
         print('\nвопрос:', prompt)
-        print('\nответ:', gpt_text2)
+        print('\nответ:', gpt_text)
         print('потрачено токенов:', tokens)
     else:
-        bot.reply_to(message, "режим gpt отключен" )
+        bot.reply_to(message, "режим GPT отключен")
 
 
 def start_menu():
@@ -98,10 +105,8 @@ def start_menu():
     item_chat_gpt = types.KeyboardButton("/gpt_chat")
     item2 = types.KeyboardButton("/start")
     item3 = types.KeyboardButton("расскажи анекдот про программиста")
-    item4 = types.KeyboardButton("🎭 текущая роль")
     item5 = types.KeyboardButton("/stop")
-    item6 = types.KeyboardButton("🎭 задать роль")
-    markup.add(item_chat_gpt, item2, item3, item4, item5, item6)
+    markup.add(item_chat_gpt, item2, item5, item3)
     return markup
 
 
