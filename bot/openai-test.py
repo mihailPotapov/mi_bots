@@ -1,6 +1,9 @@
 import telebot
+import os
 from telebot import types
 from openai import OpenAI
+from cryptography.fernet import Fernet
+from dotenv import load_dotenv
 from data_manager import TOKEN
 from db_utils import (
     user_exists,
@@ -11,9 +14,27 @@ from db_utils import (
     get_role_name
 )
 
+# Загрузка переменных окружения из .env файла
+load_dotenv()
+
+# Чтение зашифрованного API ключа из .env
+encrypted_api_key = os.getenv("ENCRYPTED_API_KEY")
+
+# Убедитесь, что зашифрованный ключ существует
+if not encrypted_api_key:
+    raise Exception("Зашифрованный API ключ не найден в .env файле.")
+
+# Чтение ключа шифрования
+with open("secret.key", "rb") as key_file:
+    key = key_file.read()
+
+# Расшифровка API ключа
+fernet = Fernet(key)
+decrypted = fernet.decrypt(encrypted_api_key.encode())
+api_key1 = decrypted.decode()
 
 bot = telebot.TeleBot(TOKEN)
-client = OpenAI(api_key='')
+client = OpenAI(api_key=api_key1)
 
 bot = telebot.TeleBot(TOKEN)
 active_chats = {}

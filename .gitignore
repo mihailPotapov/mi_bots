@@ -1,9 +1,11 @@
 аниме/
 резерв коп/
 venv/
+env/
 __pycache__/
 .idea/
 .vscode/
 env/.env
 *.db
 text.txt
+bot/secret.key
