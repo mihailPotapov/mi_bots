@@ -55,9 +55,6 @@ def welcome(message):
         bot.send_sticker(message.chat.id, hi)
         bot.send_message(message.chat.id, "Рад снова вас видеть!", reply_markup=start_menu())
         bot.send_message(message.chat.id, WELCOME_MESSAGE)
-        # bot.send_message(message.chat.id, "Что бы выбрать роль нажмите 'gpt_roles'")
-        # bot.send_message(message.chat.id, "Что бы проверить текущую роль нажмите 'current_role'")
-        # bot.send_message(message.chat.id, "Что бы завершить диалог нажмите на кнопку 'stop'")
     else:
         bot.send_sticker(message.chat.id, hi)
         add_user_to_db(user.first_name, user.username, message.chat.id)

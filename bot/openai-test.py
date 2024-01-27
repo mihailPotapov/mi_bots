@@ -1,5 +1,6 @@
 import telebot
 import os
+import random
 from telebot import types
 from openai import OpenAI
 from cryptography.fernet import Fernet
@@ -13,8 +14,12 @@ from db_utils import (
     get_db_connection,
     get_role_name
 )
+BACK_BUTTON = "◀ назад"
+history_phrases = [
+    "расскажи свою историю",
+    "расскажи забавный случай у тебя"
+]
 
-# Загрузка переменных окружения из .env файла
 load_dotenv()
 
 # Чтение зашифрованного API ключа из .env
@@ -35,14 +40,15 @@ api_key1 = decrypted.decode()
 
 bot = telebot.TeleBot(TOKEN)
 client = OpenAI(api_key=api_key1)
-
-bot = telebot.TeleBot(TOKEN)
 active_chats = {}
+
 WELCOME_MESSAGE = (
     "Что бы начать диалог нажмите на кнопку '/gpt_chat'\n"
-    "Что бы выбрать роль нажмите '/gpt_roles'\n"
-    "Что бы проверить текущую роль нажмите '/current_role'\n"
-    "Что бы завершить диалог нажмите на кнопку '/stop'"
+    "Что бы завершить диалог нажмите на кнопку '/stop⛔'\n"
+    "Что бы войти в меню для настройки gpt\n Нажмите на кнопку '/settings⚙'\n"
+    "будут доступны следующие кнопки-команды\n"
+    "Что бы выбрать роль нажмите '/gpt_roles🎭'\n"
+    "Что бы проверить текущую роль нажмите '/current_role🎭'"
 )
 
 
@@ -55,9 +61,6 @@ def welcome(message):
         bot.send_sticker(message.chat.id, hi)
         bot.send_message(message.chat.id, "Рад снова вас видеть!", reply_markup=start_menu())
         bot.send_message(message.chat.id, WELCOME_MESSAGE)
-        # bot.send_message(message.chat.id, "Что бы выбрать роль нажмите 'gpt_roles'")
-        # bot.send_message(message.chat.id, "Что бы проверить текущую роль нажмите 'current_role'")
-        # bot.send_message(message.chat.id, "Что бы завершить диалог нажмите на кнопку 'stop'")
     else:
         bot.send_sticker(message.chat.id, hi)
         add_user_to_db(user.first_name, user.username, message.chat.id)
@@ -66,7 +69,7 @@ def welcome(message):
         print("новый пользователь", user.first_name, user.username, message.chat.id)
 
 
-@bot.message_handler(commands=['gpt_chat'])
+@bot.message_handler(commands=['gpt_chat🤖'])
 def enable_gpt_chat(message):
     chat_id = message.chat.id
     active_chats[chat_id] = True
@@ -83,15 +86,24 @@ def enable_gpt_chat(message):
     conn.close()
 
     bot.send_message(chat_id, "Режим GPT чата включен.")
+    bot.send_message(message.chat.id, "Меню gpt:", reply_markup=gpt_menu())
 
 
-@bot.message_handler(commands=['stop'])
+@bot.message_handler(commands=['stop⛔'])
 def disable_gpt_chat(message):
     active_chats.pop(message.chat.id, None)
     bot.send_message(message.chat.id, "Режим GPT чата отключен.")
+    bot.send_message(message.chat.id, "Главное меню:", reply_markup=start_menu())
 
 
-@bot.message_handler(commands=['gpt_roles'])
+@bot.message_handler(commands=['settings⚙'])
+def disable_gpt_chat2(message):
+    active_chats.pop(message.chat.id, None)
+    bot.send_message(message.chat.id, "Режим GPT чата отключен для настройки.")
+    bot.send_message(message.chat.id, "Меню для настройки gpt:", reply_markup=menu_settings())
+
+
+@bot.message_handler(commands=['gpt_roles🎭'])
 def list_roles(message):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -108,7 +120,7 @@ def list_roles(message):
     bot.send_message(message.chat.id, "Вот текущие доступные роли:", reply_markup=markup)
 
 
-@bot.message_handler(commands=['current_role'])
+@bot.message_handler(commands=['current_role🎭'])
 def current_role(message):
     chat_id = message.chat.id
     conn = get_db_connection()
@@ -123,7 +135,7 @@ def current_role(message):
         role = cursor.fetchone()
 
         # Отладочная печать результата запроса
-        print(f"Результат запроса для чата {chat_id}: {role}")
+        # print(f"Результат запроса для чата {chat_id}: {role}")
 
         if role:
             bot.send_message(chat_id, f"Текущая роль: {role[0]}")
@@ -157,7 +169,12 @@ def callback_inline(call):
 @bot.message_handler(func=lambda message: True)
 def gpt(message):
     if message.chat.id in active_chats:
-        prompt = message.text
+        # Проверка на слово "history"
+        if 'история' in message.text.lower():
+            prompt = random.choice(history_phrases)
+        else:
+            prompt = message.text
+
         msg = bot.send_message(message.chat.id, 'Сообщение принято. Ждем ответа..')
         role = get_current_role(message.chat.id)
         system_message = f"Ты {role}, помощник" if role else "Ты помощник"
@@ -176,6 +193,10 @@ def gpt(message):
         print('\nвопрос:', prompt)
         print('\nответ:', gpt_text)
         print('потрачено токенов:', tokens)
+
+    elif BACK_BUTTON in message.text.lower():
+        bot.send_message(message.chat.id, "Главное меню:", reply_markup=start_menu())
+
     else:
         bot.reply_to(message, "режим GPT отключен")
 
@@ -183,14 +204,31 @@ def gpt(message):
 # Вспомогательные функции
 def start_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    item_chat_gpt = types.KeyboardButton("/gpt_chat")
-    item2 = types.KeyboardButton("/start")
-    item3 = types.KeyboardButton("расскажи анекдот про программиста")
-    item4 = types.KeyboardButton("/current_role")
-    item5 = types.KeyboardButton("/stop")
-    item6 = types.KeyboardButton("/gpt_roles")
-    markup.add(item_chat_gpt, item2, item5, item3, item6, item4)
+    item_chat_gpt = types.KeyboardButton("/gpt_chat🤖")
+    item1 = types.KeyboardButton("/start")
+    item2 = types.KeyboardButton("/settings⚙")
+    markup.add(item_chat_gpt, item1, item2)
     return markup
+
+
+def gpt_menu():
+    markup_gpt = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item_chat_gpt = types.KeyboardButton("/gpt_chat🤖")
+    item1 = types.KeyboardButton("история")
+    item2 = types.KeyboardButton("/stop⛔")
+    item3 = types.KeyboardButton("/settings⚙")
+    item4 = types.KeyboardButton(BACK_BUTTON)
+    markup_gpt.add(item_chat_gpt, item1, item2, item3, item4)
+    return markup_gpt
+
+#
+def menu_settings():
+    markup_settings = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item1 = types.KeyboardButton("/current_role🎭")
+    item2 = types.KeyboardButton("/gpt_roles🎭")
+    item3 = types.KeyboardButton(BACK_BUTTON)
+    markup_settings.add(item1, item2, item3,)
+    return markup_settings
 
 
 if __name__ == "__main__":

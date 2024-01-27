@@ -74,6 +74,7 @@ def update_chat_role(chat_id, role_id):
         cursor.close()
         conn.close()
 
+
 def get_role_name(role_id):
     conn = get_db_connection()
     cursor = conn.cursor()
