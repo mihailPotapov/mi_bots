@@ -70,7 +70,7 @@ def welcome(message):
         print("новый пользователь", user.first_name, user.username, message.chat.id)
 
 
-@bot.message_handler(commands=['gpt_chat🤖'])
+@bot.message_handler(commands=['gpt_chat'])
 def enable_gpt_chat(message):
     chat_id = message.chat.id
     user_id = get_user_id_somehow(message.chat.id)
@@ -102,22 +102,21 @@ def enable_gpt_chat(message):
     bot.send_message(chat_id, "Меню GPT:", reply_markup=gpt_menu())
 
 
-
-@bot.message_handler(commands=['stop⛔'])
+@bot.message_handler(commands=['stop'])
 def disable_gpt_stop_chat(message):
     active_chats.pop(message.chat.id, None)
     bot.send_message(message.chat.id, "Режим GPT чата отключен.")
     bot.send_message(message.chat.id, "Главное меню:", reply_markup=start_menu())
 
 
-@bot.message_handler(commands=['settings⚙'])
+@bot.message_handler(commands=['settings'])
 def disable_gpt_settings_chat(message):
     active_chats.pop(message.chat.id, None)
     bot.send_message(message.chat.id, "Режим GPT чата отключен для настройки.")
     bot.send_message(message.chat.id, "Меню для настройки gpt:", reply_markup=menu_settings())
 
 
-@bot.message_handler(commands=['gpt_roles🎭'])
+@bot.message_handler(commands=['gpt_roles'])
 def list_roles(message):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -134,7 +133,7 @@ def list_roles(message):
     bot.send_message(message.chat.id, "Вот текущие доступные роли:", reply_markup=markup_roles)
 
 
-@bot.message_handler(commands=['current_role🎭'])
+@bot.message_handler(commands=['current_role'])
 def current_role(message):
     chat_id = message.chat.id
     conn = get_db_connection()
@@ -208,7 +207,23 @@ def clear_the_history(message):
 def gpt(message):
     chat_id = message.chat.id
 
-    if chat_id in active_chats:
+    # Специальные команды, работающие независимо от режима GPT
+    if 'gpt_chat🤖' in message.text.lower():
+        enable_gpt_chat(message)
+    elif 'стоп⛔' in message.text.lower():
+        disable_gpt_stop_chat(message)
+    elif 'настройки⚙' in message.text.lower():
+        disable_gpt_settings_chat(message)
+    elif 'сменить роль🎭' in message.text.lower():
+        list_roles(message)
+    elif 'текущая роль🎭' in message.text.lower():
+        current_role(message)
+    elif 'очистить историю' in message.text.lower():
+        clear_the_history(message)
+    elif BACK_BUTTON in message.text.lower():
+        bot.send_message(message.chat.id, "Главное меню:", reply_markup=start_menu())
+    # Обработка сообщений через GPT, если режим активен
+    elif chat_id in active_chats:
         current_tokens = get_user_tokens(chat_id)
         print(f"Текущее количество токенов: {current_tokens}")  # Вывод для диагностики
         msg2 = bot.send_message(chat_id, f"Текущее количество токенов: {current_tokens}")
@@ -216,11 +231,10 @@ def gpt(message):
         if current_tokens <= 0:
             bot.send_message(chat_id, "У вас не достаточно токенов.")
             return
-        # Теперь обрабатываем сообщение как обычно
+
         prompt = message.text if 'история' not in message.text.lower() else random.choice(history_phrases)
         msg = bot.send_message(chat_id, 'Сообщение принято. Ждем ответа..')
 
-        # Получаем текущую роль и создаем запрос
         role = get_current_role(chat_id)
         system_message = f"Ты {role}" if role else "Ты помощник"
         response = client.chat.completions.create(
@@ -233,48 +247,21 @@ def gpt(message):
 
         tokens_used = response.usage.total_tokens
         print(f"Токенов использовано: {tokens_used}")
-
         if current_tokens < tokens_used:
             bot.send_message(chat_id, "У вас не достаточно токенов.")
             return
 
-        # Отправляем ответ и обновляем баланс токенов
         gpt_text = response.choices[0].message.content
         bot.delete_message(chat_id, msg.message_id)
         bot.delete_message(chat_id, msg2.message_id)
         bot.send_message(chat_id, gpt_text)
         bot.send_message(chat_id, f"Потрачено следующее количество токенов: {tokens_used}")
 
-        # Обновляем баланс токенов пользователя
         update_user_tokens(chat_id, tokens_used)
-
         bot.send_message(chat_id, f"Текущее количество токенов: {current_tokens}")
-
         print('\nВопрос:', prompt)
         print('\nОтвет:', gpt_text)
         print('Потрачено токенов:', tokens_used)
-
-    elif BACK_BUTTON in message.text.lower():
-        bot.send_message(message.chat.id, "Главное меню:", reply_markup=start_menu())
-
-    elif 'сменить роль🎭' in message.text.lower():
-        list_roles(message)
-
-    elif 'текущая роль🎭' in message.text.lower():
-        current_role(message)
-
-    elif 'настройки⚙' in message.text.lower():
-        disable_gpt_settings_chat(message)
-
-    elif 'gpt_chat🤖' in message.text.lower():
-        enable_gpt_chat(message)
-
-    elif 'стоп⛔' in message.text.lower():
-        disable_gpt_stop_chat(message)
-
-    elif 'очистить историю' in message.text.lower():
-        clear_the_history(message)
-
     else:
         bot.reply_to(message, "режим GPT отключен")
 

@@ -159,5 +159,3 @@ def get_user_id_somehow(chat_id):
         return result[0]  # Возвращаем id пользователя из таблицы users
     else:
         return None  # Пользователь не найден
-
-
