@@ -5,7 +5,7 @@ env/
 __pycache__/
 .idea/
 .vscode/
-env/.env
+.env
 *.db
 text.txt
 bot/secret.key

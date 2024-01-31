@@ -191,6 +191,7 @@ def gpt(message):
     if chat_id in active_chats:
         current_tokens = get_user_tokens(chat_id)
         print(f"Текущее количество токенов: {current_tokens}")  # Вывод для диагностики
+        bot.send_message(chat_id, f"Текущее количество токенов: {current_tokens}")
 
         if current_tokens <= 0:
             bot.send_message(chat_id, "У вас не достаточно токенов.")
@@ -222,6 +223,7 @@ def gpt(message):
         bot.delete_message(chat_id, msg.message_id)
         bot.send_message(chat_id, gpt_text)
         bot.send_message(chat_id, f"Потрачено следующее количество токенов: {tokens_used}")
+        bot.send_message(chat_id, f"Текущее количество токенов: {current_tokens}")
 
         # Обновляем баланс токенов пользователя
         update_user_tokens(chat_id, tokens_used)

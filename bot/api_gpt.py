@@ -12,7 +12,10 @@ from db_utils import (
     get_current_role,
     update_chat_role,
     get_db_connection,
-    get_role_name
+    get_role_name,
+    update_user_tokens,
+    get_user_tokens,
+    get_user_id_somehow,
 )
 BACK_BUTTON = "◀ назад"
 history_phrases = [
@@ -50,7 +53,6 @@ client = OpenAI(api_key=api_key1)
 active_chats = {}
 
 
-
 # Обработчики команд бота
 @bot.message_handler(commands=['start'])
 def welcome(message):
@@ -71,21 +73,34 @@ def welcome(message):
 @bot.message_handler(commands=['gpt_chat🤖'])
 def enable_gpt_chat(message):
     chat_id = message.chat.id
-    active_chats[chat_id] = True
+    user_id = get_user_id_somehow(message.chat.id)
+    # Получаем id пользователя из таблицы users
 
-    # Проверяем, есть ли уже запись в chat_roles для этого чата
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    # Проверяем наличие пользователя в таблице tokens
+    cursor.execute("SELECT id_user FROM tokens WHERE id_user = %s", (user_id,))
+    if not cursor.fetchone():
+        # Если записи нет, добавляем новую запись с начальным количеством токенов
+        cursor.execute("INSERT INTO tokens (id_user, token) VALUES (%s, 10000)", (user_id,))
+        conn.commit()
+
+    # Проверяем, есть ли уже запись в chat_roles для этого чата
     cursor.execute("SELECT id_chat FROM chat_roles WHERE id_chat = %s", (chat_id,))
     if not cursor.fetchone():
-        # Если нет, создаем новую запись с начальной ролью (например, id роли 1)
+        # Если нет, создаем новую запись с начальной ролью
         cursor.execute("INSERT INTO chat_roles (id_chat, id_roles) VALUES (%s, %s)", (chat_id, 1))
         conn.commit()
+
     cursor.close()
     conn.close()
 
+    # Активация чата
+    active_chats[chat_id] = True
     bot.send_message(chat_id, "Режим GPT чата включен.")
-    bot.send_message(message.chat.id, "Меню gpt:", reply_markup=gpt_menu())
+    bot.send_message(chat_id, "Меню GPT:", reply_markup=gpt_menu())
+
 
 
 @bot.message_handler(commands=['stop⛔'])
@@ -169,18 +184,45 @@ def callback_inline(call):
             bot.send_message(chat_id, f"Роль успешно сменена на '{role_name}'.")
 
 
+def clear_the_history(message):
+    chat_id = message.chat.id
+
+    # Получаем id пользователя из таблицы users
+    user_id = get_user_id_somehow(chat_id)
+    if user_id is None:
+        bot.send_message(chat_id, "Пользователь не найден.")
+        return  # Если пользователь не найден, завершаем функцию
+
+    # Обновляем количество токенов в базе данных
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE tokens SET token = 10000 WHERE id_user = %s", (user_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    bot.send_message(chat_id, "История токенов успешно восстановлена. Текущее количество токенов: 10000.")
+
+
 @bot.message_handler(func=lambda message: True)
 def gpt(message):
-    if message.chat.id in active_chats:
-        # Проверка на слово "history"
-        if 'история' in message.text.lower():
-            prompt = random.choice(history_phrases)
-        else:
-            prompt = message.text
+    chat_id = message.chat.id
 
-        msg = bot.send_message(message.chat.id, 'Сообщение принято. Ждем ответа..')
-        role = get_current_role(message.chat.id)
-        system_message = f"Ты {role}, помощник" if role else "Ты помощник"
+    if chat_id in active_chats:
+        current_tokens = get_user_tokens(chat_id)
+        print(f"Текущее количество токенов: {current_tokens}")  # Вывод для диагностики
+        msg2 = bot.send_message(chat_id, f"Текущее количество токенов: {current_tokens}")
+
+        if current_tokens <= 0:
+            bot.send_message(chat_id, "У вас не достаточно токенов.")
+            return
+        # Теперь обрабатываем сообщение как обычно
+        prompt = message.text if 'история' not in message.text.lower() else random.choice(history_phrases)
+        msg = bot.send_message(chat_id, 'Сообщение принято. Ждем ответа..')
+
+        # Получаем текущую роль и создаем запрос
+        role = get_current_role(chat_id)
+        system_message = f"Ты {role}" if role else "Ты помощник"
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -188,14 +230,29 @@ def gpt(message):
                 {"role": "user", "content": prompt}
             ]
         )
-        tokens = response.usage.total_tokens
+
+        tokens_used = response.usage.total_tokens
+        print(f"Токенов использовано: {tokens_used}")
+
+        if current_tokens < tokens_used:
+            bot.send_message(chat_id, "У вас не достаточно токенов.")
+            return
+
+        # Отправляем ответ и обновляем баланс токенов
         gpt_text = response.choices[0].message.content
-        bot.delete_message(message.chat.id, msg.message_id)
-        bot.send_message(message.chat.id, gpt_text)
-        bot.send_message(message.chat.id, f"потрачено следующее количество токенов: {tokens}")
-        print('\nвопрос:', prompt)
-        print('\nответ:', gpt_text)
-        print('потрачено токенов:', tokens)
+        bot.delete_message(chat_id, msg.message_id)
+        bot.delete_message(chat_id, msg2.message_id)
+        bot.send_message(chat_id, gpt_text)
+        bot.send_message(chat_id, f"Потрачено следующее количество токенов: {tokens_used}")
+
+        # Обновляем баланс токенов пользователя
+        update_user_tokens(chat_id, tokens_used)
+
+        bot.send_message(chat_id, f"Текущее количество токенов: {current_tokens}")
+
+        print('\nВопрос:', prompt)
+        print('\nОтвет:', gpt_text)
+        print('Потрачено токенов:', tokens_used)
 
     elif BACK_BUTTON in message.text.lower():
         bot.send_message(message.chat.id, "Главное меню:", reply_markup=start_menu())
@@ -214,6 +271,9 @@ def gpt(message):
 
     elif 'стоп⛔' in message.text.lower():
         disable_gpt_stop_chat(message)
+
+    elif 'очистить историю' in message.text.lower():
+        clear_the_history(message)
 
     else:
         bot.reply_to(message, "режим GPT отключен")
@@ -235,8 +295,8 @@ def gpt_menu():
     item1 = types.KeyboardButton("история")
     item2 = types.KeyboardButton("стоп⛔")
     item3 = types.KeyboardButton("настройки⚙")
-    item4 = types.KeyboardButton(BACK_BUTTON)
-    markup_gpt.add(item_chat_gpt, item1, item2, item3, item4)
+    back_button = types.KeyboardButton(BACK_BUTTON)
+    markup_gpt.add(item_chat_gpt, item1, item2, item3, back_button)
     return markup_gpt
 
 
@@ -244,8 +304,9 @@ def menu_settings():
     markup_settings = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1 = types.KeyboardButton("текущая роль🎭")
     item2 = types.KeyboardButton("сменить роль🎭")
-    item3 = types.KeyboardButton(BACK_BUTTON)
-    markup_settings.add(item1, item2, item3,)
+    item3 = types.KeyboardButton("очистить историю")
+    back_button = types.KeyboardButton(BACK_BUTTON)
+    markup_settings.add(item1, item2, item3, back_button)
     return markup_settings
 
 
