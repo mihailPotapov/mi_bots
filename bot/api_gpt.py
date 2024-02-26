@@ -17,6 +17,7 @@ from db_utils import (
     get_user_tokens,
     get_user_id_somehow,
 )
+# переменная кнопка
 BACK_BUTTON = "◀ назад"
 history_phrases = [
     "расскажи свою историю",
@@ -24,9 +25,7 @@ history_phrases = [
 ]
 
 load_dotenv()
-
-# Чтение зашифрованного API ключа из .env
-encrypted_api_key = os.getenv("ENCRYPTED_API_KEY")
+# переменная содержащие текст для сообщения
 WELCOME_MESSAGE = (
     "Что бы начать диалог нажмите на кнопку 'gpt_chat🤖'\n"
     "Что бы завершить диалог нажмите на кнопку 'стоп⛔'\n"
@@ -35,6 +34,8 @@ WELCOME_MESSAGE = (
     "Что бы выбрать роль нажмите 'сменить роль🎭'\n"
     "Что бы проверить текущую роль нажмите 'текущая роль🎭'"
 )
+# Чтение зашифрованного API ключа из .env
+encrypted_api_key = os.getenv("ENCRYPTED_API_KEY")
 # Убедитесь, что зашифрованный ключ существует
 if not encrypted_api_key:
     raise Exception("Зашифрованный API ключ не найден в .env файле.")
@@ -206,7 +207,6 @@ def clear_the_history(message):
 @bot.message_handler(func=lambda message: True)
 def gpt(message):
     chat_id = message.chat.id
-
     # Специальные команды, работающие независимо от режима GPT
     if 'gpt_chat🤖' in message.text.lower():
         enable_gpt_chat(message)
@@ -258,7 +258,8 @@ def gpt(message):
         bot.send_message(chat_id, f"Потрачено следующее количество токенов: {tokens_used}")
 
         update_user_tokens(chat_id, tokens_used)
-        bot.send_message(chat_id, f"Текущее количество токенов: {current_tokens}")
+        new_token_balance = current_tokens - tokens_used
+        bot.send_message(chat_id, f"Текущее количество токенов: {new_token_balance}")
         print('\nВопрос:', prompt)
         print('\nОтвет:', gpt_text)
         print('Потрачено токенов:', tokens_used)
@@ -299,5 +300,5 @@ def menu_settings():
 
 if __name__ == "__main__":
     print('Запущен...')
-    bot.polling(none_stop=True)
+    bot.infinity_polling(none_stop=True)
     print('Выключен...')

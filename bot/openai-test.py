@@ -1,12 +1,13 @@
-import telebot
+from aiogram import Bot, Dispatcher, types, executor
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 import os
 import random
-from telebot import types
-from openai import OpenAI
+import openai
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 from data_manager import TOKEN
-from db_utils import (
+from db_utils222 import (
     user_exists,
     add_user_to_db,
     get_current_role,
@@ -17,6 +18,7 @@ from db_utils import (
     get_user_tokens,
     get_user_id_somehow,
 )
+
 BACK_BUTTON = "◀ назад"
 history_phrases = [
     "расскажи свою историю",
@@ -35,7 +37,7 @@ WELCOME_MESSAGE = (
     "Что бы выбрать роль нажмите 'сменить роль🎭'\n"
     "Что бы проверить текущую роль нажмите 'текущая роль🎭'"
 )
-# Убедитесь, что зашифрованный ключ существует
+
 if not encrypted_api_key:
     raise Exception("Зашифрованный API ключ не найден в .env файле.")
 
@@ -48,196 +50,181 @@ fernet = Fernet(key)
 decrypted = fernet.decrypt(encrypted_api_key.encode())
 api_key1 = decrypted.decode()
 
-bot = telebot.TeleBot(TOKEN)
-client = OpenAI(api_key=api_key1)
+bot = Bot(token=TOKEN)
+dp = Dispatcher(bot)
+dp.middleware.setup(LoggingMiddleware())
+client = openai.OpenAI(api_key=api_key1)
 active_chats = {}
 
 
-# Обработчики команд бота
-@bot.message_handler(commands=['start'])
-def welcome(message):
-    hi = open('image/Hi.webp', 'rb')
-    user = message.from_user
-    if user_exists(user.username):
-        bot.send_sticker(message.chat.id, hi)
-        bot.send_message(message.chat.id, "Рад снова вас видеть!", reply_markup=start_menu())
-        bot.send_message(message.chat.id, WELCOME_MESSAGE)
-    else:
-        bot.send_sticker(message.chat.id, hi)
-        add_user_to_db(user.first_name, user.username, message.chat.id)
-        bot.send_message(message.chat.id, "Рад видеть новое лицо!", reply_markup=start_menu())
-        bot.send_message(message.chat.id, WELCOME_MESSAGE)
-        print("новый пользователь", user.first_name, user.username, message.chat.id)
+def start_menu() -> types.ReplyKeyboardMarkup:
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add(KeyboardButton('gpt_chat🤖'))
+    markup.add(KeyboardButton('стоп⛔'), KeyboardButton('настройки⚙'))
+    markup.add(KeyboardButton('сменить роль🎭'), KeyboardButton('текущая роль🎭'))
+    return markup
 
 
-@bot.message_handler(commands=['gpt_chat'])
-def enable_gpt_chat(message):
+@dp.message_handler(commands=['start'])
+async def welcome(message: types.Message):
+    with open('image/Hi.webp', 'rb') as hi:
+        user = message.from_user
+        if await user_exists(user.username):
+            await message.answer_photo(hi)
+            await message.answer("Рад снова вас видеть!", reply_markup=start_menu())
+            await message.answer(WELCOME_MESSAGE)
+        else:
+            await message.answer_photo(hi)
+            await add_user_to_db(user.first_name, user.username, message.chat.id)
+            await message.answer("Рад видеть новое лицо!", reply_markup=start_menu())
+            await message.answer(WELCOME_MESSAGE)
+            print("новый пользователь", user.first_name, user.username, message.chat.id)
+
+
+@dp.message_handler(commands=['gpt_chat'])
+async def enable_gpt_chat(message: types.Message):
     chat_id = message.chat.id
     user_id = get_user_id_somehow(message.chat.id)
-    # Получаем id пользователя из таблицы users
+    # Подключение к базе данных и обновление информации о пользователе
+    # Следующий блок кода аналогичен вашей логике работы с базой данных
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    async with get_db_connection() as conn:
+        async with conn.cursor() as cursor:
+            # Проверяем наличие пользователя в таблице tokens и обновляем данные
+            await cursor.execute("SELECT id_user FROM tokens WHERE id_user = %s", (user_id,))
+            if not await cursor.fetchone():
+                await cursor.execute("INSERT INTO tokens (id_user, token) VALUES (%s, 10000)", (user_id,))
+                await conn.commit()
 
-    # Проверяем наличие пользователя в таблице tokens
-    cursor.execute("SELECT id_user FROM tokens WHERE id_user = %s", (user_id,))
-    if not cursor.fetchone():
-        # Если записи нет, добавляем новую запись с начальным количеством токенов
-        cursor.execute("INSERT INTO tokens (id_user, token) VALUES (%s, 10000)", (user_id,))
-        conn.commit()
-
-    # Проверяем, есть ли уже запись в chat_roles для этого чата
-    cursor.execute("SELECT id_chat FROM chat_roles WHERE id_chat = %s", (chat_id,))
-    if not cursor.fetchone():
-        # Если нет, создаем новую запись с начальной ролью
-        cursor.execute("INSERT INTO chat_roles (id_chat, id_roles) VALUES (%s, %s)", (chat_id, 1))
-        conn.commit()
-
-    cursor.close()
-    conn.close()
+            # Проверяем и обновляем запись в chat_roles для этого чата
+            await cursor.execute("SELECT id_chat FROM chat_roles WHERE id_chat = %s", (chat_id,))
+            if not await cursor.fetchone():
+                await cursor.execute("INSERT INTO chat_roles (id_chat, id_roles) VALUES (%s, %s)", (chat_id, 1))
+                await conn.commit()
 
     # Активация чата
     active_chats[chat_id] = True
-    bot.send_message(chat_id, "Режим GPT чата включен.")
-    bot.send_message(chat_id, "Меню GPT:", reply_markup=gpt_menu())
+    await message.answer("Режим GPT чата включен.")
+    await message.answer("Меню GPT:", reply_markup=gpt_menu())
 
 
-@bot.message_handler(commands=['stop'])
-def disable_gpt_stop_chat(message):
+@dp.message_handler(commands=['stop'])
+async def disable_gpt_stop_chat(message: types.Message):
     active_chats.pop(message.chat.id, None)
-    bot.send_message(message.chat.id, "Режим GPT чата отключен.")
-    bot.send_message(message.chat.id, "Главное меню:", reply_markup=start_menu())
+    await message.answer("Режим GPT чата отключен.")
+    await message.answer("Главное меню:", reply_markup=start_menu())
 
 
-@bot.message_handler(commands=['settings'])
-def disable_gpt_settings_chat(message):
+@dp.message_handler(commands=['settings'])
+async def disable_gpt_settings_chat(message: types.Message):
     active_chats.pop(message.chat.id, None)
-    bot.send_message(message.chat.id, "Режим GPT чата отключен для настройки.")
-    bot.send_message(message.chat.id, "Меню для настройки gpt:", reply_markup=menu_settings())
+    await message.answer("Режим GPT чата отключен для настройки.")
+    await message.answer("Меню для настройки gpt:", reply_markup=menu_settings())
 
 
-@bot.message_handler(commands=['gpt_roles'])
-def list_roles(message):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id_roles, name_roles FROM roles")
-    roles = cursor.fetchall()
-    cursor.close()
-    conn.close()
+@dp.message_handler(commands=['gpt_roles'])
+async def list_roles(message: types.Message):
+    async with get_db_connection() as conn:
+        async with conn.cursor() as cursor:
+            await cursor.execute("SELECT id_roles, name_roles FROM roles")
+            roles = await cursor.fetchall()
 
-    markup_roles = types.InlineKeyboardMarkup()
+    markup_roles = InlineKeyboardMarkup()
     for role in roles:
-        button = types.InlineKeyboardButton(role[1], callback_data=f"setrole_{role[0]}")
+        button = InlineKeyboardButton(role[1], callback_data=f"setrole_{role[0]}")
         markup_roles.add(button)
 
-    bot.send_message(message.chat.id, "Вот текущие доступные роли:", reply_markup=markup_roles)
+    await message.answer("Вот текущие доступные роли:", reply_markup=markup_roles)
 
 
-@bot.message_handler(commands=['current_role'])
-def current_role(message):
+@dp.message_handler(commands=['current_role'])
+async def current_role(message: types.Message):
     chat_id = message.chat.id
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    async with get_db_connection() as conn:
+        async with conn.cursor() as cursor:
+            try:
+                await cursor.execute(
+                    "SELECT r.name_roles FROM chat_roles cr "
+                    "JOIN roles r ON cr.id_roles = r.id_roles "
+                    "WHERE cr.id_chat = %s", (chat_id,))
+                role = await cursor.fetchone()
 
-    try:
-        # Запрос для получения текущей роли для чата
-        cursor.execute(
-            "SELECT r.name_roles FROM chat_roles cr "
-            "JOIN roles r ON cr.id_roles = r.id_roles "
-            "WHERE cr.id_chat = %s", (chat_id,))
-        role = cursor.fetchone()
-
-        # Отладочная печать результата запроса
-        # print(f"Результат запроса для чата {chat_id}: {role}")
-
-        if role:
-            bot.send_message(chat_id, f"Текущая роль: {role[0]}")
-        else:
-            bot.send_message(chat_id, "Роль для данного чата не установлена.")
-    except Exception as e:
-        print(f"Произошла ошибка: {e}")
-    finally:
-        cursor.close()
-        conn.close()
+                if role:
+                    await message.answer(f"Текущая роль: {role[0]}")
+                else:
+                    await message.answer("Роль для данного чата не установлена.")
+            except Exception as e:
+                print(f"Произошла ошибка: {e}")
 
 
-# Функция обработки нажатия на кнопку inline-клавиатуры
-@bot.callback_query_handler(func=lambda call: True)
-def callback_inline(call):
-    if call.message:
-        if call.data.startswith('setrole_'):
-            role_id = int(call.data.split('_')[1])
-            chat_id = call.message.chat.id
+@dp.callback_query_handler(lambda call: call.data.startswith('setrole_'))
+async def callback_inline(call: types.CallbackQuery):
+    role_id = int(call.data.split('_')[1])
+    chat_id = call.message.chat.id
 
-            # Обновление роли в БД
-            update_chat_role(chat_id, role_id)
+    # Обновление роли в БД
+    await update_chat_role(chat_id, role_id)
 
-            # Получение названия новой роли
-            role_name = get_role_name(role_id)
+    # Получение названия новой роли
+    role_name = await get_role_name(role_id)
 
-            bot.answer_callback_query(call.id, f"Роль успешно сменена на '{role_name}'.")
-            # Удаление оригинального сообщения с клавиатурой
-            bot.delete_message(chat_id, call.message.message_id)
+    await call.answer(f"Роль успешно сменена на '{role_name}'.", show_alert=True)
+    # Удаление оригинального сообщения с клавиатурой
+    await call.message.delete()
 
-            # Отправка нового сообщения без клавиатуры
-            bot.send_message(chat_id, f"Роль успешно сменена на '{role_name}'.")
+    # Отправка нового сообщения без клавиатуры
+    await call.message.answer(f"Роль успешно сменена на '{role_name}'.")
 
 
-def clear_the_history(message):
+@dp.message_handler(commands=['clear_the_history'])
+async def clear_the_history(message: types.Message):
     chat_id = message.chat.id
-
-    # Получаем id пользователя из таблицы users
-    user_id = get_user_id_somehow(chat_id)
+    user_id = await get_user_id_somehow(chat_id)
     if user_id is None:
-        bot.send_message(chat_id, "Пользователь не найден.")
-        return  # Если пользователь не найден, завершаем функцию
+        await bot.send_message(chat_id, "Пользователь не найден.")
+        return
 
-    # Обновляем количество токенов в базе данных
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE tokens SET token = 10000 WHERE id_user = %s", (user_id,))
-    conn.commit()
-    cursor.close()
-    conn.close()
+    conn = await get_db_connection()
+    async with conn.transaction():
+        await conn.execute("UPDATE tokens SET token = 10000 WHERE id_user = $1", user_id)
 
-    bot.send_message(chat_id, "История токенов успешно восстановлена. Текущее количество токенов: 10000.")
+    await conn.close()
+
+    await bot.send_message(chat_id, "История токенов успешно восстановлена. Текущее количество токенов: 10000.")
 
 
-@bot.message_handler(func=lambda message: True)
-def gpt(message):
+@dp.message_handler()
+async def gpt(message: types.Message):
     chat_id = message.chat.id
-
     # Специальные команды, работающие независимо от режима GPT
     if 'gpt_chat🤖' in message.text.lower():
-        enable_gpt_chat(message)
+        await enable_gpt_chat(message)
     elif 'стоп⛔' in message.text.lower():
-        disable_gpt_stop_chat(message)
+        await disable_gpt_stop_chat(message)
     elif 'настройки⚙' in message.text.lower():
-        disable_gpt_settings_chat(message)
+        await disable_gpt_settings_chat(message)
     elif 'сменить роль🎭' in message.text.lower():
-        list_roles(message)
+        await list_roles(message)
     elif 'текущая роль🎭' in message.text.lower():
-        current_role(message)
+        await current_role(message)
     elif 'очистить историю' in message.text.lower():
-        clear_the_history(message)
+        await clear_the_history(message)
     elif BACK_BUTTON in message.text.lower():
-        bot.send_message(message.chat.id, "Главное меню:", reply_markup=start_menu())
-    # Обработка сообщений через GPT, если режим активен
+        await message.answer("Главное меню:", reply_markup=start_menu())
     elif chat_id in active_chats:
-        current_tokens = get_user_tokens(chat_id)
-        print(f"Текущее количество токенов: {current_tokens}")  # Вывод для диагностики
-        msg2 = bot.send_message(chat_id, f"Текущее количество токенов: {current_tokens}")
+        current_tokens = await get_user_tokens(chat_id)
+        await message.answer(f"Текущее количество токенов: {current_tokens}")
 
         if current_tokens <= 0:
-            bot.send_message(chat_id, "У вас не достаточно токенов.")
+            await message.answer("У вас не достаточно токенов.")
             return
 
         prompt = message.text if 'история' not in message.text.lower() else random.choice(history_phrases)
-        msg = bot.send_message(chat_id, 'Сообщение принято. Ждем ответа..')
+        await message.answer('Сообщение принято. Ждем ответа..')
 
-        role = get_current_role(chat_id)
+        role = await get_current_role(chat_id)
         system_message = f"Ты {role}" if role else "Ты помощник"
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_message},
@@ -246,27 +233,21 @@ def gpt(message):
         )
 
         tokens_used = response.usage.total_tokens
-        print(f"Токенов использовано: {tokens_used}")
         if current_tokens < tokens_used:
-            bot.send_message(chat_id, "У вас не достаточно токенов.")
+            await message.answer("У вас не достаточно токенов.")
             return
 
         gpt_text = response.choices[0].message.content
-        bot.delete_message(chat_id, msg.message_id)
-        bot.delete_message(chat_id, msg2.message_id)
-        bot.send_message(chat_id, gpt_text)
-        bot.send_message(chat_id, f"Потрачено следующее количество токенов: {tokens_used}")
+        await message.answer(gpt_text)
+        await message.answer(f"Потрачено следующее количество токенов: {tokens_used}")
 
-        update_user_tokens(chat_id, tokens_used)
-        bot.send_message(chat_id, f"Текущее количество токенов: {current_tokens}")
-        print('\nВопрос:', prompt)
-        print('\nОтвет:', gpt_text)
-        print('Потрачено токенов:', tokens_used)
+        await update_user_tokens(chat_id, tokens_used)
+        new_token_balance = current_tokens - tokens_used
+        await message.answer(f"Текущее количество токенов: {new_token_balance}")
     else:
-        bot.reply_to(message, "режим GPT отключен")
+        await message.reply("режим GPT отключен")
 
 
-# Вспомогательные функции
 def start_menu():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item_chat_gpt = types.KeyboardButton("gpt_chat🤖")
@@ -297,7 +278,7 @@ def menu_settings():
     return markup_settings
 
 
-if __name__ == "__main__":
-    print('Запущен...')
-    bot.polling(none_stop=True)
-    print('Выключен...')
+if __name__ == '__main__':
+    print('запущен')
+    executor.start_polling(dp)
+    print('выключен')
