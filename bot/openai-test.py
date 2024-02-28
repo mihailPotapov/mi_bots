@@ -19,6 +19,7 @@ from db_utils222 import (
     get_user_id_somehow,
 )
 
+
 BACK_BUTTON = "◀ назад"
 history_phrases = [
     "расскажи свою историю",

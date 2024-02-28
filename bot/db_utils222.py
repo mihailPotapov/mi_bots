@@ -1,11 +1,11 @@
 import aiopg
 
-# db_config = {
-#     'database': 'bot_gpt',  # Название базы данных
-#     'user': 'postgres',     # Имя пользователя
-#     'password': '123',      # Пароль
-#     'host': 'localhost'     # Хост
-# }
+db_config = {
+    'database': 'bot_gpt',  # Название базы данных
+    'user': 'postgres',     # Имя пользователя
+    'password': '123',      # Пароль
+    'host': 'localhost'     # Хост
+}
 
 
 async def get_db_connection():
@@ -46,7 +46,7 @@ async def get_role_name(role_id):
 
 
 async def get_user_tokens(chat_id):
-    async with aiopg.create_pool(dsn) as pool:
+    async with aiopg.create_pool() as pool:
         async with pool.acquire() as conn:
             async with conn.cursor() as cursor:
                 # Получаем id пользователя из таблицы users
