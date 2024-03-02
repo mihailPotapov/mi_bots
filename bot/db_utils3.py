@@ -7,6 +7,8 @@ db_config = {
     'host': 'localhost'     # Хост
 }
 
+async def get_db_pool():
+    return await aiopg.create_pool(dsn='dbname=bot_gpt user=postgres password=123 host=localhost')
 
 async def get_db_connection():
     dsn = 'dbname=bot_gpt user=postgres password=123 host=localhost'.format(**db_config)

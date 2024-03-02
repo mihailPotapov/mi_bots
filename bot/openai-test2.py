@@ -4,22 +4,20 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 import os
 import random
 import openai
-import asyncio
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 from data_manager import TOKEN
-from db_utils2 import (
+from db_utils3 import (
     user_exists,
-    get_db_pool,
-    update_user_tokens,
+    get_db_connection,
     add_user_to_db,
     get_current_role,
     update_chat_role,
     get_role_name,
+    update_user_tokens,
     get_user_tokens,
     get_user_id_somehow,
 )
-
 
 
 BACK_BUTTON = "◀ назад"
@@ -67,48 +65,45 @@ def start_menu() -> types.ReplyKeyboardMarkup:
     markup.add(KeyboardButton('сменить роль🎭'), KeyboardButton('текущая роль🎭'))
     return markup
 
-async def on_startup(dispatcher):
-    global db_pool
-    db_pool = await get_db_pool()
-    print('Бот запущен и подключение к БД установлено.')
-
 
 @dp.message_handler(commands=['start'])
 async def welcome(message: types.Message):
     with open('image/Hi.webp', 'rb') as hi:
         user = message.from_user
-        if await user_exists(user.username, db_pool):
+        if await user_exists(user.username):
             await message.answer_photo(hi)
             await message.answer("Рад снова вас видеть!", reply_markup=start_menu())
             await message.answer(WELCOME_MESSAGE)
-            print('зашел старый пользователь')
         else:
             await message.answer_photo(hi)
-            await add_user_to_db(user.first_name, user.username, message.chat.id, db_pool)
+            await add_user_to_db(user.first_name, user.username, message.chat.id)
             await message.answer("Рад видеть новое лицо!", reply_markup=start_menu())
             await message.answer(WELCOME_MESSAGE)
             print("новый пользователь", user.first_name, user.username, message.chat.id)
 
 
 @dp.message_handler(commands=['gpt_chat'])
-async def enable_gpt_chat(message: types.Message, db_pool):
+async def enable_gpt_chat(message: types.Message):
     chat_id = message.chat.id
-    user_id = await get_user_id_somehow(chat_id, db_pool)  # Убедитесь, что эта функция реализована
-    if user_id is None:
-        await message.answer("Пользователь не найден.")
-        return
+    user_id = await get_user_id_somehow(message.chat.id)
+    # Подключение к базе данных и обновление информации о пользователе
+    # Следующий блок кода аналогичен вашей логике работы с базой данных
 
-    async with db_pool.acquire() as conn:
-        # Проверяем наличие пользователя в таблице tokens и обновляем данные
-        row = await conn.fetchrow("SELECT id_user FROM tokens WHERE id_user = $1", user_id)
-        if not row:
-            await conn.execute("INSERT INTO tokens (id_user, token) VALUES ($1, $2)", user_id, 10000)
+    async with get_db_connection() as conn:
+        async with conn.cursor() as cursor:
+            # Проверяем наличие пользователя в таблице tokens и обновляем данные
+            await cursor.execute("SELECT id_user FROM tokens WHERE id_user = %s", (user_id,))
+            if not await cursor.fetchone():
+                await cursor.execute("INSERT INTO tokens (id_user, token) VALUES (%s, 10000)", (user_id,))
+                await conn.commit()
 
-        # Проверяем и обновляем запись в chat_roles для этого чата
-        row = await conn.fetchrow("SELECT id_chat FROM chat_roles WHERE id_chat = $1", chat_id)
-        if not row:
-            await conn.execute("INSERT INTO chat_roles (id_chat, id_roles) VALUES ($1, $2)", chat_id, 1)
+            # Проверяем и обновляем запись в chat_roles для этого чата
+            await cursor.execute("SELECT id_chat FROM chat_roles WHERE id_chat = %s", (chat_id,))
+            if not await cursor.fetchone():
+                await cursor.execute("INSERT INTO chat_roles (id_chat, id_roles) VALUES (%s, %s)", (chat_id, 1))
+                await conn.commit()
 
+    # Активация чата
     active_chats[chat_id] = True
     await message.answer("Режим GPT чата включен.")
     await message.answer("Меню GPT:", reply_markup=gpt_menu())
@@ -129,110 +124,96 @@ async def disable_gpt_settings_chat(message: types.Message):
 
 
 @dp.message_handler(commands=['gpt_roles'])
-async def list_roles(message: types.Message, db_pool):
-    # Предполагаем, что db_pool глобально доступен и уже инициализирован, например, в функции on_startup
-
-    async with db_pool.acquire() as conn:  # Получаем соединение из пула
-        # В asyncpg нет необходимости создавать курсор для выполнения запроса
-        roles = await conn.fetch("SELECT id_roles, name_roles FROM roles")
+async def list_roles(message: types.Message):
+    async with get_db_connection() as conn:
+        async with conn.cursor() as cursor:
+            await cursor.execute("SELECT id_roles, name_roles FROM roles")
+            roles = await cursor.fetchall()
 
     markup_roles = InlineKeyboardMarkup()
     for role in roles:
-        button = InlineKeyboardButton(role['name_roles'], callback_data=f"setrole_{role['id_roles']}")
+        button = InlineKeyboardButton(role[1], callback_data=f"setrole_{role[0]}")
         markup_roles.add(button)
 
     await message.answer("Вот текущие доступные роли:", reply_markup=markup_roles)
 
 
 @dp.message_handler(commands=['current_role'])
-async def current_role(message: types.Message, db_pool):
+async def current_role(message: types.Message):
     chat_id = message.chat.id
-    # Предполагается, что get_db_pool() - это ваша функция для получения пула соединений
-    # Убедитесь, что db_pool глобально доступен и уже инициализирован
+    async with get_db_connection() as conn:
+        async with conn.cursor() as cursor:
+            try:
+                await cursor.execute(
+                    "SELECT r.name_roles FROM chat_roles cr "
+                    "JOIN roles r ON cr.id_roles = r.id_roles "
+                    "WHERE cr.id_chat = %s", (chat_id,))
+                role = await cursor.fetchone()
 
-    async with db_pool.acquire() as conn:  # Получаем соединение из пула
-        try:
-            # Используем conn.fetchrow() для выполнения запроса и получения одной строки
-            role = await conn.fetchrow(
-                "SELECT r.name_roles FROM chat_roles cr "
-                "JOIN roles r ON cr.id_roles = r.id_roles "
-                "WHERE cr.id_chat = $1", chat_id)
-
-            if role:
-                await message.answer(f"Текущая роль: {role['name_roles']}")
-            else:
-                await message.answer("Роль для данного чата не установлена.")
-        except Exception as e:
-            await message.answer("Произошла ошибка при попытке получить текущую роль.")
-            print(f"Произошла ошибка: {e}")
+                if role:
+                    await message.answer(f"Текущая роль: {role[0]}")
+                else:
+                    await message.answer("Роль для данного чата не установлена.")
+            except Exception as e:
+                print(f"Произошла ошибка: {e}")
 
 
 @dp.callback_query_handler(lambda call: call.data.startswith('setrole_'))
 async def callback_inline(call: types.CallbackQuery):
-    try:
-        role_id = int(call.data.split('_')[1])
-        chat_id = call.message.chat.id
-        # Обновление роли в БД
-        await update_chat_role(chat_id, role_id, db_pool)
-        # Получение названия новой роли
-        role_name = await get_role_name(role_id, db_pool)
+    role_id = int(call.data.split('_')[1])
+    chat_id = call.message.chat.id
 
-        if role_name:
-            await call.answer(f"Роль успешно сменена на '{role_name}'.", show_alert=True)
-            # Удаление оригинального сообщения с клавиатурой
-            await call.message.delete()
+    # Обновление роли в БД
+    await update_chat_role(chat_id, role_id)
 
-            # Отправка нового сообщения без клавиатуры
-            await call.message.answer(f"Роль успешно сменена на '{role_name}'.")
-        else:
-            await call.answer("Произошла ошибка при смене роли.", show_alert=True)
-    except Exception as e:
-        await call.answer("Произошла ошибка при обработке вашего запроса.", show_alert=True)
-        print(f"Ошибка: {e}")
+    # Получение названия новой роли
+    role_name = await get_role_name(role_id)
+
+    await call.answer(f"Роль успешно сменена на '{role_name}'.", show_alert=True)
+    # Удаление оригинального сообщения с клавиатурой
+    await call.message.delete()
+
+    # Отправка нового сообщения без клавиатуры
+    await call.message.answer(f"Роль успешно сменена на '{role_name}'.")
 
 
 @dp.message_handler(commands=['clear_the_history'])
-async def clear_the_history(message: types.Message, db_pool):
+async def clear_the_history(message: types.Message):
     chat_id = message.chat.id
-    try:
-        # Предполагается, что эта функция корректно возвращает user_id для данного chat_id
-        user_id = await get_user_id_somehow(chat_id, db_pool)  # Добавлен db_pool как аргумент, если нужно
-        if user_id is None:
-            await message.reply("Пользователь не найден.")
-            return
+    user_id = await get_user_id_somehow(chat_id)
+    if user_id is None:
+        await bot.send_message(chat_id, "Пользователь не найден.")
+        return
 
-        # Используем переданный db_pool напрямую
-        async with db_pool.acquire() as conn:  # Получаем соединение из пула
-            async with conn.transaction():  # Начинаем транзакцию
-                # Предположим, что у вас есть таблица tokens с колонками id_user и token
-                await conn.execute("UPDATE tokens SET token = 10000 WHERE id_user = $1", user_id)
+    conn = await get_db_connection()
+    async with conn.transaction():
+        await conn.execute("UPDATE tokens SET token = 10000 WHERE id_user = $1", user_id)
 
-        await message.reply("История токенов успешно восстановлена. Текущее количество токенов: 10000.")
-    except Exception as e:
-        await message.reply("Произошла ошибка при обработке запроса.")
-        print(f"Ошибка: {e}")
+    await conn.close()
 
+    await bot.send_message(chat_id, "История токенов успешно восстановлена. Текущее количество токенов: 10000.")
 
 
 @dp.message_handler()
 async def gpt(message: types.Message):
     chat_id = message.chat.id
+    # Специальные команды, работающие независимо от режима GPT
     if 'gpt_chat🤖' in message.text.lower():
-        await enable_gpt_chat(message, db_pool)
+        await enable_gpt_chat(message)
     elif 'стоп⛔' in message.text.lower():
         await disable_gpt_stop_chat(message)
     elif 'настройки⚙' in message.text.lower():
         await disable_gpt_settings_chat(message)
     elif 'сменить роль🎭' in message.text.lower():
-        await list_roles(message, db_pool)
+        await list_roles(message)
     elif 'текущая роль🎭' in message.text.lower():
-        await current_role(message, db_pool)
+        await current_role(message)
     elif 'очистить историю' in message.text.lower():
-        await clear_the_history(message, db_pool)
+        await clear_the_history(message)
     elif BACK_BUTTON in message.text.lower():
         await message.answer("Главное меню:", reply_markup=start_menu())
     elif chat_id in active_chats:
-        current_tokens = await get_user_tokens(chat_id, db_pool)
+        current_tokens = await get_user_tokens(chat_id)
         await message.answer(f"Текущее количество токенов: {current_tokens}")
 
         if current_tokens <= 0:
@@ -242,17 +223,15 @@ async def gpt(message: types.Message):
         prompt = message.text if 'история' not in message.text.lower() else random.choice(history_phrases)
         await message.answer('Сообщение принято. Ждем ответа..')
 
-        role = await get_current_role(chat_id, db_pool)
+        role = await get_current_role(chat_id)
         system_message = f"Ты {role}" if role else "Ты помощник"
-        # Предполагается, что `client` инициализирован с нужными настройками OpenAI
-        response = await asyncio.get_event_loop().run_in_executor(None, lambda: client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": prompt}
-            ],
-            max_tokens=700
-        ))
+            ]
+        )
 
         tokens_used = response.usage.total_tokens
         if current_tokens < tokens_used:
@@ -263,7 +242,7 @@ async def gpt(message: types.Message):
         await message.answer(gpt_text)
         await message.answer(f"Потрачено следующее количество токенов: {tokens_used}")
 
-        await update_user_tokens(chat_id, -tokens_used, db_pool)
+        await update_user_tokens(chat_id, tokens_used)
         new_token_balance = current_tokens - tokens_used
         await message.answer(f"Текущее количество токенов: {new_token_balance}")
     else:
@@ -300,9 +279,7 @@ def menu_settings():
     return markup_settings
 
 
-async def on_shutdown(dispatcher):
-    await db_pool.close()
-    print('Бот выключен и соединение с БД закрыто.')
-
 if __name__ == '__main__':
-    executor.start_polling(dp, on_startup=on_startup, on_shutdown=on_shutdown)
+    print('запущен')
+    executor.start_polling(dp)
+    print('выключен')
