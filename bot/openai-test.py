@@ -1,6 +1,7 @@
 from aiogram import Bot, Dispatcher, types, executor
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from pathlib import Path
 import os
 import random
 import openai
@@ -21,8 +22,8 @@ from db_utils2 import (
 )
 
 
-
 BACK_BUTTON = "◀ назад"
+
 history_phrases = [
     "расскажи свою историю",
     "расскажи забавный случай у тебя"
@@ -57,7 +58,12 @@ bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 dp.middleware.setup(LoggingMiddleware())
 client = openai.OpenAI(api_key=api_key1)
+# флаги
 active_chats = {}
+user_flags = {}
+# Проверяем и создаем папку для временного хранения аудиофайлов, если необходимо
+temp_audio_folder = Path("temp_audio")
+temp_audio_folder.mkdir(exist_ok=True)
 
 
 def start_menu() -> types.ReplyKeyboardMarkup:
@@ -66,6 +72,7 @@ def start_menu() -> types.ReplyKeyboardMarkup:
     markup.add(KeyboardButton('стоп⛔'), KeyboardButton('настройки⚙'))
     markup.add(KeyboardButton('сменить роль🎭'), KeyboardButton('текущая роль🎭'))
     return markup
+
 
 async def on_startup(dispatcher):
     global db_pool
@@ -213,7 +220,47 @@ async def clear_the_history(message: types.Message, db_pool):
         print(f"Ошибка: {e}")
 
 
+# голосовой обработчик
+openai_client = client
 
+
+@dp.message_handler(commands=['speech'])
+async def speech_to_voice(message: types.Message):
+    try:
+        # Получаем текст для преобразования, убирая команду /speech
+        text_to_speech = message.text[len('/speech '):].strip()
+
+        # Проверяем, что текст не пустой
+        if not text_to_speech:
+            await message.reply("Пожалуйста, введите текст после команды /speech.")
+            return
+
+        # Создаем голосовое сообщение
+        response = openai_client.audio.speech.create(
+            model="tts-1",
+            voice="nova",
+            input=text_to_speech
+        )
+
+        # Сохраняем аудиофайл в папке temp_audio
+        speech_file_path = temp_audio_folder / f"{message.from_user.id}_{message.message_id}.mp3"
+
+        # В зависимости от вашей версии SDK, метод сохранения файла может отличаться
+        with speech_file_path.open('wb') as file:
+            file.write(
+                response.content)  # Или использовать response.stream_to_file(speech_file_path), если это поддерживается
+
+        # Отправляем аудиофайл пользователю
+        with speech_file_path.open('rb') as audio:
+            await message.reply_voice(voice=audio)
+
+        # Удаляем файл после отправки, если необходимо
+        speech_file_path.unlink()
+
+    except Exception as e:
+        await message.reply(f"Произошла ошибка: {e}")
+
+# главный обработчик
 @dp.message_handler()
 async def gpt(message: types.Message):
     chat_id = message.chat.id
@@ -233,14 +280,14 @@ async def gpt(message: types.Message):
         await message.answer("Главное меню:", reply_markup=start_menu())
     elif chat_id in active_chats:
         current_tokens = await get_user_tokens(chat_id, db_pool)
-        await message.answer(f"Текущее количество токенов: {current_tokens}")
+        msg2 = await message.answer(f"Текущее количество токенов: {current_tokens}")
 
         if current_tokens <= 0:
             await message.answer("У вас не достаточно токенов.")
             return
 
         prompt = message.text if 'история' not in message.text.lower() else random.choice(history_phrases)
-        await message.answer('Сообщение принято. Ждем ответа..')
+        msg = await message.answer('Сообщение принято. Ждем ответа..')
 
         role = await get_current_role(chat_id, db_pool)
         system_message = f"Ты {role}" if role else "Ты помощник"
@@ -260,6 +307,8 @@ async def gpt(message: types.Message):
             return
 
         gpt_text = response.choices[0].message.content
+        await bot.delete_message(chat_id, msg.message_id)
+        await bot.delete_message(chat_id, msg2.message_id)
         await message.answer(gpt_text)
         await message.answer(f"Потрачено следующее количество токенов: {tokens_used}")
 

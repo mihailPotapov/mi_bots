@@ -46,6 +46,7 @@ async def update_chat_role(chat_id, role_id, db_pool):
             # Создаем новую запись
             await connection.execute("INSERT INTO chat_roles (id_chat, id_roles) VALUES ($1, $2)", chat_id, role_id)
 
+
 async def get_role_name(role_id, db_pool):
     async with db_pool.acquire() as connection:
         role_name = await connection.fetchval("SELECT name_roles FROM roles WHERE id_roles = $1", role_id)
@@ -68,6 +69,7 @@ async def get_user_tokens(chat_id, db_pool):
 
     return token_count
 
+
 async def update_user_tokens(chat_id, tokens_used, db_pool):
     async with db_pool.acquire() as conn:
         # Получаем id пользователя из таблицы users
@@ -87,7 +89,10 @@ async def update_user_tokens(chat_id, tokens_used, db_pool):
         current_tokens = token_row['token']
 
         # Вычитаем потраченные токены и обновляем баланс в базе данных
-        new_token_balance = current_tokens - tokens_used
+        # старный глюк место вычитание складывание и наобород
+        # (предположение что в tokens_used сразу передают отрицательное значение)
+        new_token_balance = current_tokens + tokens_used
+        print(f"ОТЛАДКА- Текущее количество токенов:{new_token_balance}")
         await conn.execute("UPDATE tokens SET token = $1 WHERE id_user = $2", new_token_balance, user_id)
 
 
