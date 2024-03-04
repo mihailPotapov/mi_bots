@@ -409,13 +409,13 @@ async def gpt(message: types.Message):
     elif 'текущая роль🎭' in message.text.lower():
         await current_role(message, db_pool)
     elif 'роли🎭' in message.text.lower():
-        await message.answer("Меню для настройки ролей::", reply_markup=menu_settings_role())
+        await message.answer("Меню для настройки ролей:", reply_markup=menu_settings_role())
     elif 'голоса🗣' in message.text.lower():
-        await message.answer("Меню для настройки модели голоса::", reply_markup=menu_settings_voice())
-    elif 'очистить историю' in message.text.lower():
+        await message.answer("Меню для настройки модели голоса:", reply_markup=menu_settings_voice())
+    elif 'очистить историю⌛' in message.text.lower():
         await clear_the_history(message, db_pool)
     elif BACK_BUTTON2 in message.text.lower():
-        await message.answer("Меню для настройки gpt::", reply_markup=menu_settings())
+        await message.answer("Меню для настройки gpt:", reply_markup=menu_settings())
     elif BACK_BUTTON in message.text.lower():
         await message.answer("Главное меню:", reply_markup=start_menu())
     elif chat_id in active_chats:
@@ -483,7 +483,7 @@ def menu_settings():
     markup_settings = types.ReplyKeyboardMarkup(resize_keyboard=True)
     item1 = types.KeyboardButton("роли🎭")
     item2 = types.KeyboardButton("голоса🗣")
-    item3 = types.KeyboardButton("очистить историю")
+    item3 = types.KeyboardButton("очистить историю⌛")
     back_button = types.KeyboardButton(BACK_BUTTON)
     markup_settings.add(item1, item2, item3, back_button)
     return markup_settings
