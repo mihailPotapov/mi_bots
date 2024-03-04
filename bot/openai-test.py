@@ -19,11 +19,13 @@ from db_utils2 import (
     get_role_name,
     get_user_tokens,
     get_user_id_somehow,
+    get_all_voices
 )
 
 
 BACK_BUTTON = "◀ назад"
 
+BACK_BUTTON2 = "◀ назад в настройки"
 history_phrases = [
     "расскажи свою историю",
     "расскажи забавный случай у тебя"
@@ -40,6 +42,7 @@ WELCOME_MESSAGE = (
     "будут доступны следующие кнопки-команды\n"
     "Что бы выбрать роль нажмите 'сменить роль🎭'\n"
     "Что бы проверить текущую роль нажмите 'текущая роль🎭'"
+    "новая команда /speech позволит вам озвучить текст пример '/speech я gpt бот, чем могу помочь?'"
 )
 
 if not encrypted_api_key:
@@ -65,6 +68,14 @@ user_flags = {}
 temp_audio_folder = Path("temp_audio")
 temp_audio_folder.mkdir(exist_ok=True)
 
+async def get_voice_keyboard():
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    voices = await get_all_voices(db_pool)  # Это функция, которую вам нужно реализовать для получения голосов из БД
+    for voice in voices:
+        callback_data = f"voice_{voice['id']}"  # Пример callback_data, можете адаптировать под свои нужды
+        keyboard.add(types.InlineKeyboardButton(text=voice['name_voice'], callback_data=callback_data))
+    return keyboard
+
 
 def start_menu() -> types.ReplyKeyboardMarkup:
     markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -85,12 +96,12 @@ async def welcome(message: types.Message):
     with open('image/Hi.webp', 'rb') as hi:
         user = message.from_user
         if await user_exists(user.username, db_pool):
-            await message.answer_photo(hi)
+            await message.answer_sticker(hi)
             await message.answer("Рад снова вас видеть!", reply_markup=start_menu())
             await message.answer(WELCOME_MESSAGE)
             print('зашел старый пользователь')
         else:
-            await message.answer_photo(hi)
+            await message.answer_sticker(hi)
             await add_user_to_db(user.first_name, user.username, message.chat.id, db_pool)
             await message.answer("Рад видеть новое лицо!", reply_markup=start_menu())
             await message.answer(WELCOME_MESSAGE)
@@ -133,6 +144,7 @@ async def disable_gpt_settings_chat(message: types.Message):
     active_chats.pop(message.chat.id, None)
     await message.answer("Режим GPT чата отключен для настройки.")
     await message.answer("Меню для настройки gpt:", reply_markup=menu_settings())
+
 
 
 @dp.message_handler(commands=['gpt_roles'])
@@ -220,6 +232,123 @@ async def clear_the_history(message: types.Message, db_pool):
         print(f"Ошибка: {e}")
 
 
+# обработка голоса
+async def get_user_voice_choice(user_id, db_pool):
+    async with db_pool.acquire() as connection:
+        # Попытаемся получить выбранный голос пользователя
+        user_voice_query = """
+        SELECT v.name_voice 
+        FROM voice_chat vc 
+        JOIN voice v ON vc.voice_id = v.id 
+        WHERE vc.user_id = $1;
+        """
+        user_voice_row = await connection.fetchrow(user_voice_query, user_id)
+
+        # Если у пользователя установлен выбор голоса, возвращаем его
+        if user_voice_row:
+            return user_voice_row['name_voice']
+        else:
+            # Если у пользователя не установлен выбор голоса, возвращаем голос по умолчанию (id=1)
+            default_voice_query = "SELECT name_voice FROM voice WHERE id = 1;"
+            default_voice_row = await connection.fetchrow(default_voice_query)
+            return default_voice_row['name_voice'] if default_voice_row else None
+
+
+# ОБРАБОТКА И РАБОТА С МОДЕЛЯМИ ДЛЯ ГОЛОСА
+@dp.message_handler(commands=['voice'])
+async def show_voice_options(message: types.Message):
+    keyboard = await get_voice_keyboard()
+    await message.answer("Выберите модель голоса:", reply_markup=keyboard)
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith('voice_'))
+async def handle_voice_choice(callback_query: types.CallbackQuery):
+    try:
+        voice_id = int(callback_query.data.split('_')[1])
+        user_id = callback_query.from_user.id
+
+        # Обновляем выбор голосовой модели пользователя в БД
+        await update_user_voice_choice(user_id, voice_id, db_pool)
+
+        # Получаем название новой голосовой модели
+        async with db_pool.acquire() as conn:
+            voice_name_record = await conn.fetchrow("SELECT name_voice FROM voice WHERE id = $1", voice_id)
+        voice_name = voice_name_record['name_voice'] if voice_name_record else 'Неизвестная модель'
+
+        if voice_name:
+            await callback_query.answer(f"Модель голоса успешно изменена на '{voice_name}'.", show_alert=True)
+            # Удаление оригинального сообщения с клавиатурой
+            await callback_query.message.delete()
+
+            # Отправка нового сообщения без клавиатуры
+            await callback_query.message.answer(f"Модель голоса успешно изменена на '{voice_name}'.")
+        else:
+            await callback_query.answer("Произошла ошибка при смене модели голоса.", show_alert=True)
+    except Exception as e:
+        await callback_query.answer("Произошла ошибка при обработке вашего запроса.", show_alert=True)
+        print(f"Ошибка: {e}")
+
+
+
+async def ensure_user_exists(user_id, db_pool):
+    async with db_pool.acquire() as conn:
+        # Проверяем, существует ли пользователь
+        user_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM users WHERE user_id = $1)", user_id)
+        if not user_exists:
+            # Если пользователя нет, создаем нового
+            await conn.execute("INSERT INTO users (user_id) VALUES ($1)", user_id)
+
+
+async def ensure_user_exists(user_id, db_pool):
+    async with db_pool.acquire() as conn:
+        # Проверяем, существует ли уже пользователь с данным id
+        user_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)", user_id)
+
+        if not user_exists:
+            # Если пользователь не существует, вставляем его в таблицу users
+            # Замените следующий запрос на соответствующий вашей схеме БД и требованиям
+            await conn.execute("INSERT INTO users (id) VALUES ($1)", user_id)
+
+
+async def update_user_voice_choice(user_id, voice_id, db_pool):
+    await ensure_user_exists(user_id, db_pool)  # Убедитесь, что пользователь существует, перед вставкой/обновлением
+
+    voice_id = int(voice_id)  # Преобразование voice_id из строки в целое число
+    async with db_pool.acquire() as conn:
+        # Проверяем, есть ли уже запись в voice_chat для этого пользователя
+        existing_voice_chat = await conn.fetchrow("SELECT * FROM voice_chat WHERE user_id = $1", user_id)
+
+        if existing_voice_chat:
+            # Если запись существует, обновляем ее
+            await conn.execute("UPDATE voice_chat SET voice_id = $2 WHERE user_id = $1", user_id, voice_id)
+        else:
+            # Если записи нет, создаем новую
+            await conn.execute("INSERT INTO voice_chat (user_id, voice_id) VALUES ($1, $2)", user_id, voice_id)
+
+#             проверка модели какая стоит
+@dp.message_handler(commands=['the_voice'])
+async def get_user_voice_model(message: types.Message, db_pool):
+    user_id = message.from_user.id
+
+    async with db_pool.acquire() as conn:
+        # Получаем voice_id для данного пользователя
+        voice_id_record = await conn.fetchrow("SELECT voice_id FROM voice_chat WHERE user_id = $1", user_id)
+
+        if voice_id_record:
+            voice_id = voice_id_record['voice_id']
+            # Предполагается, что у вас есть способ получить название модели по voice_id.
+            # Здесь нужен дополнительный запрос к БД или логика для получения названия модели.
+            # Пример:
+            voice_name_record = await conn.fetchrow("SELECT name_voice FROM voice WHERE id = $1", voice_id)
+            if voice_name_record:
+                voice_name = voice_name_record['name_voice']
+                await message.reply(f"Вы используете голосовую модель: {voice_name}.")
+            else:
+                await message.reply("Название голосовой модели не найдено.")
+        else:
+            await message.reply("Вы ещё не назначена голосовая модель (стоит по умолчанию nova).")
+
+
 # голосовой обработчик
 openai_client = client
 
@@ -227,38 +356,39 @@ openai_client = client
 @dp.message_handler(commands=['speech'])
 async def speech_to_voice(message: types.Message):
     try:
-        # Получаем текст для преобразования, убирая команду /speech
         text_to_speech = message.text[len('/speech '):].strip()
 
-        # Проверяем, что текст не пустой
         if not text_to_speech:
             await message.reply("Пожалуйста, введите текст после команды /speech.")
             return
 
-        # Создаем голосовое сообщение
+        # Извлекаем выбор голоса пользователя из базы данных
+        user_voice_choice = await get_user_voice_choice(message.from_user.id, db_pool)  # Предполагается, что db_pool доступен
+
+        # Если для пользователя не установлен выбор голоса, используем голос по умолчанию
+        if not user_voice_choice:
+            user_voice_choice = "nova"  # Значение голоса по умолчанию
+
+        # Создаем голосовое сообщение с выбранным голосом пользователя
         response = openai_client.audio.speech.create(
             model="tts-1",
-            voice="nova",
+            voice=user_voice_choice,
             input=text_to_speech
         )
 
-        # Сохраняем аудиофайл в папке temp_audio
+        # Сохраняем, отправляем и удаляем аудиофайл, как описано выше
         speech_file_path = temp_audio_folder / f"{message.from_user.id}_{message.message_id}.mp3"
-
-        # В зависимости от вашей версии SDK, метод сохранения файла может отличаться
         with speech_file_path.open('wb') as file:
-            file.write(
-                response.content)  # Или использовать response.stream_to_file(speech_file_path), если это поддерживается
+            file.write(response.content)  # Используйте соответствующий метод сохранения файла
 
-        # Отправляем аудиофайл пользователю
         with speech_file_path.open('rb') as audio:
             await message.reply_voice(voice=audio)
 
-        # Удаляем файл после отправки, если необходимо
         speech_file_path.unlink()
 
     except Exception as e:
         await message.reply(f"Произошла ошибка: {e}")
+
 
 # главный обработчик
 @dp.message_handler()
@@ -272,10 +402,20 @@ async def gpt(message: types.Message):
         await disable_gpt_settings_chat(message)
     elif 'сменить роль🎭' in message.text.lower():
         await list_roles(message, db_pool)
+    elif 'сменить голос🗣' in message.text.lower():
+        await show_voice_options(message)
+    elif 'текущая модель голоса🗣' in message.text.lower():
+        await get_user_voice_model(message, db_pool)
     elif 'текущая роль🎭' in message.text.lower():
         await current_role(message, db_pool)
+    elif 'роли🎭' in message.text.lower():
+        await message.answer("Меню для настройки ролей::", reply_markup=menu_settings_role())
+    elif 'голоса🗣' in message.text.lower():
+        await message.answer("Меню для настройки модели голоса::", reply_markup=menu_settings_voice())
     elif 'очистить историю' in message.text.lower():
         await clear_the_history(message, db_pool)
+    elif BACK_BUTTON2 in message.text.lower():
+        await message.answer("Меню для настройки gpt::", reply_markup=menu_settings())
     elif BACK_BUTTON in message.text.lower():
         await message.answer("Главное меню:", reply_markup=start_menu())
     elif chat_id in active_chats:
@@ -341,11 +481,29 @@ def gpt_menu():
 
 def menu_settings():
     markup_settings = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    item1 = types.KeyboardButton("текущая роль🎭")
-    item2 = types.KeyboardButton("сменить роль🎭")
+    item1 = types.KeyboardButton("роли🎭")
+    item2 = types.KeyboardButton("голоса🗣")
     item3 = types.KeyboardButton("очистить историю")
     back_button = types.KeyboardButton(BACK_BUTTON)
     markup_settings.add(item1, item2, item3, back_button)
+    return markup_settings
+
+
+def menu_settings_role():
+    markup_settings = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item1 = types.KeyboardButton("текущая роль🎭")
+    item2 = types.KeyboardButton("сменить роль🎭")
+    back_button = types.KeyboardButton(BACK_BUTTON2)
+    markup_settings.add(item1, item2, back_button)
+    return markup_settings
+
+
+def menu_settings_voice():
+    markup_settings = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item1 = types.KeyboardButton("сменить голос🗣")
+    item2 = types.KeyboardButton("текущая модель голоса🗣")
+    back_button = types.KeyboardButton(BACK_BUTTON2)
+    markup_settings.add(item1, item2, back_button)
     return markup_settings
 
 

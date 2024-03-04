@@ -96,6 +96,14 @@ async def update_user_tokens(chat_id, tokens_used, db_pool):
         await conn.execute("UPDATE tokens SET token = $1 WHERE id_user = $2", new_token_balance, user_id)
 
 
+async def get_all_voices(db_pool):
+    async with db_pool.acquire() as connection:
+        query = "SELECT id, name_voice FROM voice"
+        rows = await connection.fetch(query)
+        return rows
+
+
+
 async def get_user_id_somehow(chat_id, db_pool):
     async with db_pool.acquire() as conn:
         result = await conn.fetchrow("SELECT id FROM users WHERE id_chat = $1", chat_id)
