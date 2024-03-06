@@ -145,6 +145,7 @@ def update_user_tokens(chat_id, tokens_used):
     cursor.close()
     conn.close()
 
+
 def get_user_id_somehow(chat_id):
     conn = get_db_connection()
     cursor = conn.cursor()

@@ -25,15 +25,18 @@ async def add_user_to_db(name_user, nickname_user, id_chat, db_pool):
         await connection.execute("INSERT INTO users (name_user, nickname_user, id_chat) VALUES ($1, $2, $3)",
                                  name_user, nickname_user, id_chat)
 
+
 async def set_user_role(chat_id, role_id, db_pool):
     async with db_pool.acquire() as connection:
         await connection.execute("UPDATE chat_roles SET id_roles = $1 WHERE id_chat = $2",
                                  role_id, chat_id)
 
+
 async def get_current_role(chat_id, db_pool):
     async with db_pool.acquire() as connection:
         role_name = await connection.fetchval("SELECT r.name_roles FROM chat_roles cr JOIN roles r ON cr.id_roles = r.id_roles WHERE cr.id_chat = $1", chat_id)
         return role_name
+
 
 async def update_chat_role(chat_id, role_id, db_pool):
     async with db_pool.acquire() as connection:
@@ -102,6 +105,31 @@ async def get_all_voices(db_pool):
         rows = await connection.fetch(query)
         return rows
 
+
+async def ensure_user_exists(user_id, db_pool):
+    async with db_pool.acquire() as conn:
+        # Проверяем, существует ли уже пользователь с данным id
+        user_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)", user_id)
+
+        if not user_exists:
+            # Если пользователь не существует, вставляем его в таблицу users
+            # Замените следующий запрос на соответствующий вашей схеме БД и требованиям
+            await conn.execute("INSERT INTO users (id) VALUES ($1)", user_id)
+
+
+async def update_user_voice_choice(chat_id, voice_id, db_pool):
+    voice_id = int(voice_id)  # Преобразование voice_id из строки в целое число
+
+    async with db_pool.acquire() as conn:
+        # Проверяем, есть ли уже запись в voice_chat для этого chat_id
+        existing_voice_chat = await conn.fetchrow("SELECT * FROM voice_chat WHERE chat_id = $1", chat_id)
+
+        if existing_voice_chat:
+            # Если запись существует, обновляем ее
+            await conn.execute("UPDATE voice_chat SET voice_id = $2 WHERE chat_id = $1", chat_id, voice_id)
+        else:
+            # Если записи нет, создаем новую
+            await conn.execute("INSERT INTO voice_chat (chat_id, voice_id) VALUES ($1, $2)", chat_id, voice_id)
 
 
 async def get_user_id_somehow(chat_id, db_pool):

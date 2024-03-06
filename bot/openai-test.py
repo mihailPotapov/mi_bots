@@ -6,6 +6,7 @@ import os
 import random
 import openai
 import asyncio
+import traceback
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
 from data_manager import TOKEN
@@ -19,7 +20,9 @@ from db_utils2 import (
     get_role_name,
     get_user_tokens,
     get_user_id_somehow,
-    get_all_voices
+    get_all_voices,
+    update_user_voice_choice,
+    ensure_user_exists,
 )
 
 
@@ -68,6 +71,7 @@ user_flags = {}
 temp_audio_folder = Path("temp_audio")
 temp_audio_folder.mkdir(exist_ok=True)
 
+
 async def get_voice_keyboard():
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     voices = await get_all_voices(db_pool)  # Это функция, которую вам нужно реализовать для получения голосов из БД
@@ -75,14 +79,6 @@ async def get_voice_keyboard():
         callback_data = f"voice_{voice['id']}"  # Пример callback_data, можете адаптировать под свои нужды
         keyboard.add(types.InlineKeyboardButton(text=voice['name_voice'], callback_data=callback_data))
     return keyboard
-
-
-def start_menu() -> types.ReplyKeyboardMarkup:
-    markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    markup.add(KeyboardButton('gpt_chat🤖'))
-    markup.add(KeyboardButton('стоп⛔'), KeyboardButton('настройки⚙'))
-    markup.add(KeyboardButton('сменить роль🎭'), KeyboardButton('текущая роль🎭'))
-    return markup
 
 
 async def on_startup(dispatcher):
@@ -144,7 +140,6 @@ async def disable_gpt_settings_chat(message: types.Message):
     active_chats.pop(message.chat.id, None)
     await message.answer("Режим GPT чата отключен для настройки.")
     await message.answer("Меню для настройки gpt:", reply_markup=menu_settings())
-
 
 
 @dp.message_handler(commands=['gpt_roles'])
@@ -233,16 +228,16 @@ async def clear_the_history(message: types.Message, db_pool):
 
 
 # обработка голоса
-async def get_user_voice_choice(user_id, db_pool):
+async def get_user_voice_choice(chat_id, db_pool):
     async with db_pool.acquire() as connection:
         # Попытаемся получить выбранный голос пользователя
         user_voice_query = """
         SELECT v.name_voice 
         FROM voice_chat vc 
         JOIN voice v ON vc.voice_id = v.id 
-        WHERE vc.user_id = $1;
+        WHERE vc.chat_id = $1;  
         """
-        user_voice_row = await connection.fetchrow(user_voice_query, user_id)
+        user_voice_row = await connection.fetchrow(user_voice_query, chat_id)
 
         # Если у пользователя установлен выбор голоса, возвращаем его
         if user_voice_row:
@@ -265,10 +260,10 @@ async def show_voice_options(message: types.Message):
 async def handle_voice_choice(callback_query: types.CallbackQuery):
     try:
         voice_id = int(callback_query.data.split('_')[1])
-        user_id = callback_query.from_user.id
+        chat_id = callback_query.message.chat.id  # Используем chat_id вместо user_id
 
         # Обновляем выбор голосовой модели пользователя в БД
-        await update_user_voice_choice(user_id, voice_id, db_pool)
+        await update_user_voice_choice(chat_id, voice_id, db_pool)  # Предполагаем, что update_user_voice_choice адаптирован под новую структуру
 
         # Получаем название новой голосовой модели
         async with db_pool.acquire() as conn:
@@ -289,56 +284,18 @@ async def handle_voice_choice(callback_query: types.CallbackQuery):
         print(f"Ошибка: {e}")
 
 
-
-async def ensure_user_exists(user_id, db_pool):
-    async with db_pool.acquire() as conn:
-        # Проверяем, существует ли пользователь
-        user_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM users WHERE user_id = $1)", user_id)
-        if not user_exists:
-            # Если пользователя нет, создаем нового
-            await conn.execute("INSERT INTO users (user_id) VALUES ($1)", user_id)
-
-
-async def ensure_user_exists(user_id, db_pool):
-    async with db_pool.acquire() as conn:
-        # Проверяем, существует ли уже пользователь с данным id
-        user_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)", user_id)
-
-        if not user_exists:
-            # Если пользователь не существует, вставляем его в таблицу users
-            # Замените следующий запрос на соответствующий вашей схеме БД и требованиям
-            await conn.execute("INSERT INTO users (id) VALUES ($1)", user_id)
-
-
-async def update_user_voice_choice(user_id, voice_id, db_pool):
-    await ensure_user_exists(user_id, db_pool)  # Убедитесь, что пользователь существует, перед вставкой/обновлением
-
-    voice_id = int(voice_id)  # Преобразование voice_id из строки в целое число
-    async with db_pool.acquire() as conn:
-        # Проверяем, есть ли уже запись в voice_chat для этого пользователя
-        existing_voice_chat = await conn.fetchrow("SELECT * FROM voice_chat WHERE user_id = $1", user_id)
-
-        if existing_voice_chat:
-            # Если запись существует, обновляем ее
-            await conn.execute("UPDATE voice_chat SET voice_id = $2 WHERE user_id = $1", user_id, voice_id)
-        else:
-            # Если записи нет, создаем новую
-            await conn.execute("INSERT INTO voice_chat (user_id, voice_id) VALUES ($1, $2)", user_id, voice_id)
-
 #             проверка модели какая стоит
 @dp.message_handler(commands=['the_voice'])
 async def get_user_voice_model(message: types.Message, db_pool):
-    user_id = message.from_user.id
+    chat_id = message.chat.id  # Пример изменения: используем chat_id вместо user_id
 
     async with db_pool.acquire() as conn:
-        # Получаем voice_id для данного пользователя
-        voice_id_record = await conn.fetchrow("SELECT voice_id FROM voice_chat WHERE user_id = $1", user_id)
+        # Получаем voice_id для данного пользователя/чата
+        voice_id_record = await conn.fetchrow("SELECT voice_id FROM voice_chat WHERE chat_id = $1", chat_id)
 
         if voice_id_record:
             voice_id = voice_id_record['voice_id']
-            # Предполагается, что у вас есть способ получить название модели по voice_id.
-            # Здесь нужен дополнительный запрос к БД или логика для получения названия модели.
-            # Пример:
+            # Получаем название модели по voice_id
             voice_name_record = await conn.fetchrow("SELECT name_voice FROM voice WHERE id = $1", voice_id)
             if voice_name_record:
                 voice_name = voice_name_record['name_voice']
@@ -346,7 +303,9 @@ async def get_user_voice_model(message: types.Message, db_pool):
             else:
                 await message.reply("Название голосовой модели не найдено.")
         else:
-            await message.reply("Вы ещё не назначена голосовая модель (стоит по умолчанию nova).")
+            await message.reply("Вы ещё не выбрали голосовую модель. Используется модель по умолчанию.")
+
+
 
 
 # голосовой обработчик
@@ -362,24 +321,28 @@ async def speech_to_voice(message: types.Message):
             await message.reply("Пожалуйста, введите текст после команды /speech.")
             return
 
+        # Предположим, что chat_id это ID чата, где была вызвана команда
+        chat_id = message.chat.id
+
         # Извлекаем выбор голоса пользователя из базы данных
-        user_voice_choice = await get_user_voice_choice(message.from_user.id, db_pool)  # Предполагается, что db_pool доступен
+        user_voice_choice = await get_user_voice_choice(chat_id, db_pool)  # db_pool должен быть доступен
 
         # Если для пользователя не установлен выбор голоса, используем голос по умолчанию
         if not user_voice_choice:
             user_voice_choice = "nova"  # Значение голоса по умолчанию
 
         # Создаем голосовое сообщение с выбранным голосом пользователя
+        # Проверьте, что openai_client и соответствующие настройки корректно настроены
         response = openai_client.audio.speech.create(
             model="tts-1",
             voice=user_voice_choice,
             input=text_to_speech
         )
 
-        # Сохраняем, отправляем и удаляем аудиофайл, как описано выше
+        # Сохраняем, отправляем и удаляем аудиофайл
         speech_file_path = temp_audio_folder / f"{message.from_user.id}_{message.message_id}.mp3"
         with speech_file_path.open('wb') as file:
-            file.write(response.content)  # Используйте соответствующий метод сохранения файла
+            file.write(response.content)  # Предполагается, что response.content содержит аудиофайл
 
         with speech_file_path.open('rb') as audio:
             await message.reply_voice(voice=audio)
@@ -387,6 +350,8 @@ async def speech_to_voice(message: types.Message):
         speech_file_path.unlink()
 
     except Exception as e:
+        print(f"Произошла ошибка при обработке команды speech: {e}")
+        traceback.print_exc()
         await message.reply(f"Произошла ошибка: {e}")
 
 
